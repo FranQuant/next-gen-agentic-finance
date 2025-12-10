@@ -1,0 +1,67 @@
+# ---------------------------------------
+# PYTHON
+# ---------------------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.sqlite
+*.db
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# ---------------------------------------
+# JUPYTER
+# ---------------------------------------
+.ipynb_checkpoints/
+
+# ---------------------------------------
+# SECRETS & CREDENTIALS
+# ---------------------------------------
+.env
+.env.*
+*.env.*
+*.cfg
+*.ini
+credentials.json
+secret.json
+tavily_key.txt
+oanda.cfg
+
+# Prevent accidental leaks via filenames
+**/*API_KEY*
+**/*api_key*
+**/*apikey*
+**/*secret*
+**/*token*
+
+# ---------------------------------------
+# OUTPUTS / ARTIFACTS
+# ---------------------------------------
+plots/
+outputs/
+tmp/
+logs/
+*.png
+*.svg
+*.jpg
+
+# ---------------------------------------
+# EDITORS / OS
+# ---------------------------------------
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
+
+# ---------------------------------------
+# BUILD / PACKAGING
+# ---------------------------------------
+build/
+dist/
+*.egg-info/
+*.egg
