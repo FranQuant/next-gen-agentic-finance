@@ -8,7 +8,7 @@ This repository provides a set of agentic finance examples built with:
 * LM Studio https://lmstudio.ai
 * OpenAI GPT-5.1 models
 * Local LLMs via LM Studio
-* Oanda API (market data)
+* Oanda API (market data) https://www.oanda.com/uk-en/trading/ 
 * Tavily API (web research) https://www.tavily.com
 * Pandas / NumPy (data processing)
 * Matplotlib (plots)
