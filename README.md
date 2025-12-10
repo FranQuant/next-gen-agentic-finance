@@ -31,7 +31,7 @@ This project uses **UV** for reproducible Python environments.
 ### 1.1 Clone the repository
 
 ```bash
-git clone <your_repo_url>
+git clone https://github.com/FranQuant/next-gen-agentic-finance.git
 cd 10_agentic_finance
 ```
 
