@@ -4,11 +4,12 @@ Multi-Agent Workflows for Market Data, Research, and Strategy Prototyping
 
 This repository provides a set of agentic finance examples built with:
 
-* AGNO (multi-agent and AgentOS framework)
+* AGNO (multi-agent and AgentOS framework) https://www.agno.com 
+* LM Studio https://lmstudio.ai
 * OpenAI GPT-5.1 models
 * Local LLMs via LM Studio
 * Oanda API (market data)
-* Tavily API (web research)
+* Tavily API (web research) https://www.tavily.com
 * Pandas / NumPy (data processing)
 * Matplotlib (plots)
 * FastAPI / Uvicorn (service layer)
