@@ -25,12 +25,11 @@ env/
 .env
 .env.*
 *.env.*
-*.cfg
-*.ini
+
+oanda.cfg
 credentials.json
 secret.json
 tavily_key.txt
-oanda.cfg
 
 # Prevent accidental leaks via filenames
 **/*API_KEY*
@@ -40,15 +39,29 @@ oanda.cfg
 **/*token*
 
 # ---------------------------------------
-# OUTPUTS / ARTIFACTS
+# DATA ARTIFACTS
 # ---------------------------------------
 plots/
 outputs/
 tmp/
 logs/
+
 *.png
 *.svg
 *.jpg
+*.parquet
+*.feather
+*.h5
+
+# ---------------------------------------
+# TEST / TOOLING
+# ---------------------------------------
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.uv/
 
 # ---------------------------------------
 # EDITORS / OS
