@@ -24,5 +24,9 @@ dependencies = [
     "python-dotenv>=1.0",
     "requests>=2.32",
     "pytest>=8.0",
-    "matplotlib>=3.9"
+    "matplotlib>=3.9",
+    "tpqoa",
 ]
+
+[tool.uv.sources]
+tpqoa = { git = "https://github.com/yhilpisch/tpqoa.git" }
