@@ -26,6 +26,8 @@ dependencies = [
     "pytest>=8.0",
     "matplotlib>=3.9",
     "tpqoa",
+    "fredapi>=0.5.2",
+    "tavily-python>=0.7.21",
 ]
 
 [tool.uv.sources]
