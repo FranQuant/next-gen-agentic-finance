@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import tpqoa
@@ -36,6 +36,8 @@ class OandaMarketDataAdapter(MarketDataAdapter):
         Raises:
             ValueError: If no rows are returned by the provider.
         """
+        start = start.astimezone(timezone.utc).replace(tzinfo=None)
+        end = end.astimezone(timezone.utc).replace(tzinfo=None)
         history = self._client.get_history(
             instrument=instrument,
             start=start,
@@ -43,6 +45,7 @@ class OandaMarketDataAdapter(MarketDataAdapter):
             granularity=granularity,
             price="M",
         )
+        history.index = pd.to_datetime(history.index, utc=True)
         if history is None or history.empty:
             raise ValueError(
                 f"No history returned for instrument={instrument}, "
@@ -57,21 +60,23 @@ class OandaMarketDataAdapter(MarketDataAdapter):
         Raises:
             ValueError: If price data is unavailable.
         """
+        end = datetime.utcnow().replace(microsecond=0)
+        start = (end - timedelta(days=7)).replace(microsecond=0)
+
         latest = self._client.get_history(
             instrument=instrument,
-            granularity="M1",
-            count=1,
+            start=start,
+            end=end,
+            granularity="D",
+            price="M",
         )
         if latest is None or latest.empty:
             raise ValueError(f"No latest price data returned for instrument={instrument}.")
 
-        if "c" in latest.columns:
-            close_value = latest["c"].iloc[-1]
-        elif "close" in latest.columns:
-            close_value = latest["close"].iloc[-1]
-        else:
+        if "c" not in latest.columns:
             raise ValueError(
                 f"Latest price data for instrument={instrument} has no close column."
             )
 
+        close_value = latest["c"].iloc[-1]
         return float(close_value)

@@ -32,3 +32,11 @@ dependencies = [
 
 [tool.uv.sources]
 tpqoa = { git = "https://github.com/yhilpisch/tpqoa.git" }
+
+[tool.setuptools]
+packages = ["core"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests",
+]

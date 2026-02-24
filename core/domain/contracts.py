@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -60,6 +61,7 @@ class RegimeDecision(BaseModel):
     regime: Regime
     confidence: float
     rationale: str
+    decided_at: datetime
 
 
 class AllocationPlan(BaseModel):
@@ -71,8 +73,15 @@ class AllocationPlan(BaseModel):
 
 
 class ResearchPacket(BaseModel):
+    packet_id: str
+    as_of: datetime
+    created_at: datetime
+    engine_version: str
+    ruleset_version: str
+    input_provenance: List[DataProvenance] = Field(default_factory=list)
+    feature_values: Dict[str, float] = Field(default_factory=dict)
+    rule_trace: List[str] = Field(default_factory=list)
     snapshot: Optional[MarketSnapshot] = None
     regime: Optional[RegimeDecision] = None
     allocation: Optional[AllocationPlan] = None
     debug: Dict[str, Any] = Field(default_factory=dict)
-
