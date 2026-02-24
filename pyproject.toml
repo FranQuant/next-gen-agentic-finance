@@ -38,5 +38,6 @@ packages = ["core"]
 
 [tool.pytest.ini_options]
 markers = [
-    "integration: marks tests as integration tests",
+    "integration: tests that hit real external services",
+    "regression: deterministic offline regression tests",
 ]

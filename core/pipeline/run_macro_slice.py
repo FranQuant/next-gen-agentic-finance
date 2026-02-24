@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from core.adapters.market_data import MarketDataAdapter
 from core.adapters.fred_adapter import FredMacroAdapter
 from core.adapters.oanda_adapter import OandaMarketDataAdapter
 from core.domain.contracts import DataProvenance, ResearchPacket
@@ -26,7 +27,14 @@ def _extract_rule_id_from_rationale(rationale: str) -> str:
     return rule_id
 
 
-def run_macro_slice(instrument: str, start: datetime, end: datetime) -> ResearchPacket:
+def run_macro_slice(
+    instrument: str,
+    start: datetime,
+    end: datetime,
+    *,
+    market: MarketDataAdapter | None = None,
+    macro: FredMacroAdapter | None = None,
+) -> ResearchPacket:
     """Run a deterministic macro regime slice for a single instrument and date window."""
     if not instrument:
         raise ValueError("instrument is required.")
@@ -39,8 +47,8 @@ def run_macro_slice(instrument: str, start: datetime, end: datetime) -> Research
     if start.tzinfo.utcoffset(start) != timedelta(0) or end.tzinfo.utcoffset(end) != timedelta(0):
         raise ValueError("start and end must be in UTC.")
 
-    market = OandaMarketDataAdapter()
-    macro = FredMacroAdapter()
+    market = market or OandaMarketDataAdapter()
+    macro = macro or FredMacroAdapter()
     fb = DeterministicFeatureBuilder(market, macro)
     eng = DeterministicRegimeEngine()
 
