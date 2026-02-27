@@ -23,11 +23,16 @@ dependencies = [
     "youtube-transcript-api>=1.2.3",
     "python-dotenv>=1.0",
     "requests>=2.32",
-    "pytest>=8.0",
     "matplotlib>=3.9",
     "tpqoa",
     "fredapi>=0.5.2",
     "tavily-python>=0.7.21",
+    "yfinance>=0.2"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0"
 ]
 
 [tool.uv.sources]

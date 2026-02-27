@@ -26,4 +26,4 @@ agent = Agent(
 )
 
 
-agent.print_response("what is the latest news on Gold?", stream=True)
+agent.print_response("what are the latest news on GLD?", stream=True)

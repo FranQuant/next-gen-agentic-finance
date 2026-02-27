@@ -29,9 +29,18 @@ market_data_agent = Agent(
     model=OpenAIResponses(id="gpt-5.1"),
     tools=[YFinanceTools()],
     instructions=dedent("""
-        Fetch and summarize all market + fundamental data for a ticker.
-        ALWAYS call tools for data. Never fabricate numbers.
-        Explicitly state unavailable fields.
+        Fetch required financial data for the ticker using tools.
+        Return ONLY a concise structured summary containing:
+        - last price
+        - 52W high and low
+        - TTM revenue
+        - TTM EPS and forward EPS
+        - operating margin
+        - net margin
+        - cash and total debt
+        - analyst mean target price
+        Limit output to 500 tokens maximum.
+        Do NOT include raw tool JSON.
     """),
     markdown=True,
     db=db,
@@ -67,7 +76,7 @@ hedge_fund_team = Team(
     name="AI Hedge Fund Analysis Team",
     model=OpenAIResponses(id="gpt-5.1"),
     members=[market_data_agent, strategy_agent],
-    tools=[ReasoningTools(add_instructions=True)],
+    tools=[ReasoningTools(add_instructions=False)],
     instructions=dedent("""
         Workflow:
         1. Delegate to Market Data Agent.
@@ -120,8 +129,16 @@ async def run_json(agent_id: str, payload: dict = Body(...)):
     }
     """
     msg = payload.get("message", "")
-    agent = agent_os.get_agent(agent_id)
-    return await agent.run(msg)
+    if agent_id != hedge_fund_os.id:
+        return {"detail": f"unknown agent_id: {agent_id}"}
+    result = await hedge_fund_os.run(msg)
+
+    if hasattr(result, "usage") and result.usage:
+        print("\n--- Token Usage ---")
+        print(result.usage)
+        print("-------------------\n")
+
+    return result
 
 
 # ---------------------------------------------------------

@@ -32,9 +32,8 @@ agent = Agent(
 
 
 # use run for production
-response: RunOutput = agent.run("What is the latest new on Gold?")
+response: RunOutput = agent.run("What are the latest news on Gold?")
 
 # print the response
 print(response.content)
-
 

@@ -1311,7 +1311,6 @@ dependencies = [
     { name = "openai" },
     { name = "pandas" },
     { name = "pypdf" },
-    { name = "pytest" },
     { name = "python-dotenv" },
     { name = "quantmod" },
     { name = "requests" },
@@ -1319,7 +1318,13 @@ dependencies = [
     { name = "tavily-python" },
     { name = "tpqoa" },
     { name = "uvicorn" },
+    { name = "yfinance" },
     { name = "youtube-transcript-api" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -1337,7 +1342,7 @@ requires-dist = [
     { name = "openai", specifier = ">=2.3.0" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "pypdf", specifier = ">=6.1.1" },
-    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "python-dotenv", specifier = ">=1.0" },
     { name = "quantmod", specifier = "==0.1.0" },
     { name = "requests", specifier = ">=2.32" },
@@ -1345,8 +1350,10 @@ requires-dist = [
     { name = "tavily-python", specifier = ">=0.7.21" },
     { name = "tpqoa", git = "https://github.com/yhilpisch/tpqoa.git" },
     { name = "uvicorn", specifier = ">=0.38.0" },
+    { name = "yfinance", specifier = ">=0.2" },
     { name = "youtube-transcript-api", specifier = ">=1.2.3" },
 ]
+provides-extras = ["dev"]
 
 [[package]]
 name = "numpy"
