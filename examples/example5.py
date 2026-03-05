@@ -9,7 +9,7 @@ from textwrap import dedent
 # 1. Load LatAm stocks CSV
 # ---------------------------------------------------------
 csv_tool = CsvTools(
-    csvs=["../latamstocks.csv"]  # relative path from /examples/
+    csvs=["data/latamstocks.csv"]  # relative path from /examples/
 )
 
 # ---------------------------------------------------------

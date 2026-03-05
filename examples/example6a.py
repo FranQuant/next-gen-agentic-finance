@@ -73,6 +73,6 @@ agent = Agent(
 
 if __name__ == "__main__":
     agent.print_response(
-        "What is the maximum pain for AAPL options expiring on 2026-02-20?",
+        "What is the maximum pain for AAPL options expiring on 2026-03-06?",
         stream=True
     )
