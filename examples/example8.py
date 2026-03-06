@@ -1,5 +1,8 @@
 # example8.py  — Multi-Agent Hedge Fund Team using GPT-5.1
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from agno.agent import Agent
 from agno.team import Team
 from agno.tools.reasoning import ReasoningTools

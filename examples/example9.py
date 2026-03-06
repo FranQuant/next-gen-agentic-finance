@@ -1,160 +1,173 @@
-# examples/example9.py
-# Hedge Fund OS – AgentOS Server using GPT-5.1 (JSON-only API)
+# example9.py — Deterministic Multi-Agent Quant Research System
 
-from textwrap import dedent
+from dotenv import load_dotenv
+import os
 
-from fastapi import Body
+load_dotenv()
+
 from agno.agent import Agent
 from agno.team import Team
+from agno.tools.reasoning import ReasoningTools
 from agno.db.sqlite import SqliteDb
 from agno.models.openai import OpenAIResponses
-from agno.tools.reasoning import ReasoningTools
-from agno.tools.yfinance import YFinanceTools
-from agno.os import AgentOS
+from textwrap import dedent
+
+# local financial tools
+from finance_tools import (
+    get_current_stock_price,
+    get_analyst_recommendations,
+    get_company_info,
+    get_company_news
+)
+
+# ------------------------------------------------
+# Persistent storage
+# ------------------------------------------------
+
+db = SqliteDb(db_file="tmp/research_team.db")
 
 
-# ---------------------------------------------------------
-# 1. Persistent storage
-# ---------------------------------------------------------
-db = SqliteDb(db_file="tmp/agentos_hedge_fund_team.db")
+# ------------------------------------------------
+# Agent 1 — Market Data Agent
+# ------------------------------------------------
 
-
-# ---------------------------------------------------------
-# 2. Market Data Agent
-# ---------------------------------------------------------
 market_data_agent = Agent(
-    id="market-data-agent",
     name="Market Data Agent",
-    role="Financial Data Retrieval Specialist",
+    role="Financial Market Data Retrieval Specialist",
+
     model=OpenAIResponses(id="gpt-5.1"),
-    tools=[YFinanceTools()],
+
+    tools=[
+        get_current_stock_price,
+        get_company_info,
+        get_company_news,
+        get_analyst_recommendations
+    ],
+
     instructions=dedent("""
-        Fetch required financial data for the ticker using tools.
-        Return ONLY a concise structured summary containing:
-        - last price
-        - 52W high and low
-        - TTM revenue
-        - TTM EPS and forward EPS
-        - operating margin
-        - net margin
-        - cash and total debt
-        - analyst mean target price
-        Limit output to 500 tokens maximum.
-        Do NOT include raw tool JSON.
-    """),
+You are a financial data analyst responsible for producing
+a structured market snapshot for a given ticker.
+
+Always retrieve data using the available tools.
+
+The snapshot should include:
+
+• current price
+• valuation metrics (P/E, P/B, dividend yield, EPS if available)
+• business description
+• recent news headlines
+• analyst recommendation trends
+
+Return the output as a structured dataset suitable for
+quantitative research analysis.
+
+Never fabricate numbers.
+If data is unavailable, explicitly say so.
+"""),
+
     markdown=True,
-    db=db,
 )
 
 
-# ---------------------------------------------------------
-# 3. Strategy Agent
-# ---------------------------------------------------------
+# ------------------------------------------------
+# Agent 2 — Quant Strategy Agent
+# ------------------------------------------------
+
 strategy_agent = Agent(
-    id="quant-strategy-agent",
     name="Quantitative Strategist",
-    role="Trading Strategy Developer",
+    role="Hedge Fund Strategy Analyst",
+
     model=OpenAIResponses(id="gpt-5.1"),
+
     instructions=dedent("""
-        Using ONLY the Market Data Agent output, produce:
-        - stance (buy/sell/hold)
-        - entry/exit zones (ranges)
-        - position sizing logic
-        - 3-scenario qualitative framework
-        - risk management plan
-        Never invent missing quantitative data.
-    """),
+You are a quantitative strategist at a hedge fund.
+
+Using the structured market snapshot provided by the
+Market Data Agent, construct an investment thesis.
+
+Your output should include:
+
+• Investment thesis (1–2 lines)
+• 3–5 supporting arguments
+• Scenario framework:
+  - bull case
+  - base case
+  - bear case
+• Key catalysts (6–24 month horizon)
+• Major risks
+• Suggested positioning (entry zone, horizon, sizing considerations)
+
+Do not fabricate financial data.
+Base reasoning only on the provided snapshot.
+"""),
+
     markdown=True,
-    db=db,
 )
 
 
-# ---------------------------------------------------------
-# 4. Team Pipeline (internal, not exposed)
-# ---------------------------------------------------------
-hedge_fund_team = Team(
-    name="AI Hedge Fund Analysis Team",
+# ------------------------------------------------
+# Team Coordinator
+# ------------------------------------------------
+
+research_team = Team(
+    name="AI Hedge Fund Research Team",
+
     model=OpenAIResponses(id="gpt-5.1"),
-    members=[market_data_agent, strategy_agent],
-    tools=[ReasoningTools(add_instructions=False)],
+
+    members=[
+        market_data_agent,
+        strategy_agent
+    ],
+
+    tools=[
+        ReasoningTools(add_instructions=True)
+    ],
+
     instructions=dedent("""
-        Workflow:
-        1. Delegate to Market Data Agent.
-        2. Delegate to Strategy Agent.
-        3. Produce final investment memo.
-    """),
+You orchestrate a deterministic hedge-fund research workflow.
+
+Workflow:
+
+1. Ask the Market Data Agent to produce a structured market snapshot.
+
+   The snapshot must include:
+   - current price
+   - valuation metrics
+   - business description
+   - analyst sentiment
+   - relevant recent news
+
+2. Capture the output from the Market Data Agent.
+
+3. Pass the FULL snapshot explicitly to the Quantitative Strategist.
+
+4. The strategist must produce an investment thesis based strictly
+   on the snapshot.
+
+5. Finally synthesize BOTH outputs into a clean
+   hedge-fund-style research memo.
+
+Rules:
+
+• Never fabricate missing data
+• Preserve tool outputs exactly
+• Clearly separate DATA vs INTERPRETATION in the final report
+"""),
+
     db=db,
+
     markdown=True,
 )
 
 
-# ---------------------------------------------------------
-# 5. Exposed Orchestrator Agent (JSON input only)
-# ---------------------------------------------------------
-class HedgeFundOSAgent(Agent):
+# ------------------------------------------------
+# Run the system
+# ------------------------------------------------
 
-    async def run(self, input_data: str):
-        """Accepts a JSON string and passes it to the team pipeline."""
-        result = hedge_fund_team.run(input_data)
-        return result
-
-
-hedge_fund_os = HedgeFundOSAgent(
-    id="hedge-fund-os",
-    name="Hedge Fund OS",
-    role="Team Coordinator",
-    model=OpenAIResponses(id="gpt-5.1"),
-    instructions="You orchestrate the internal hedge_fund_team pipeline.",
-    markdown=True,
-    db=db,
-)
-
-
-# ---------------------------------------------------------
-# 6. AgentOS registration
-# ---------------------------------------------------------
-agent_os = AgentOS(agents=[hedge_fund_os])
-app = agent_os.get_app()
-
-
-# ---------------------------------------------------------
-# 7. Override POST /agents/{id}/runs to use JSON instead of multipart
-# ---------------------------------------------------------
-@app.post("/agents/{agent_id}/runs/json")
-async def run_json(agent_id: str, payload: dict = Body(...)):
-    """
-    Clean JSON endpoint:
-    {
-        "message": "Analyze AAPL"
-    }
-    """
-    msg = payload.get("message", "")
-    if agent_id != hedge_fund_os.id:
-        return {"detail": f"unknown agent_id: {agent_id}"}
-    result = await hedge_fund_os.run(msg)
-
-    if hasattr(result, "usage") and result.usage:
-        print("\n--- Token Usage ---")
-        print(result.usage)
-        print("-------------------\n")
-
-    return result
-
-
-# ---------------------------------------------------------
-# 8. Health check endpoint (optional)
-# ---------------------------------------------------------
-@app.get("/hedge_fund_os_alive")
-async def alive():
-    return {
-        "status": "Hedge Fund OS is running (JSON mode)",
-        "agents": ["hedge-fund-os"],
-    }
-
-
-# ---------------------------------------------------------
-# 9. Entry point
-# ---------------------------------------------------------
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+
+    research_team.print_response(
+        "Perform a hedge-fund style research memo for MSFT.",
+        stream=True,
+        show_full_reasoning=True
+    )
