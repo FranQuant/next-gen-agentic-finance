@@ -1,13 +1,10 @@
-# example9.py — Deterministic Multi-Agent Quant Research System
+# example9.py — Compact Deterministic Multi-Agent Research Demo
 
 from dotenv import load_dotenv
-import os
-
 load_dotenv()
 
 from agno.agent import Agent
 from agno.team import Team
-from agno.tools.reasoning import ReasoningTools
 from agno.db.sqlite import SqliteDb
 from agno.models.openai import OpenAIResponses
 from textwrap import dedent
@@ -17,7 +14,7 @@ from finance_tools import (
     get_current_stock_price,
     get_analyst_recommendations,
     get_company_info,
-    get_company_news
+    get_company_news,
 )
 
 # ------------------------------------------------
@@ -26,81 +23,133 @@ from finance_tools import (
 
 db = SqliteDb(db_file="tmp/research_team.db")
 
+MODEL = OpenAIResponses(id="gpt-5-mini")
+# swap to gpt-5.1 later if you want higher quality:
+# MODEL = OpenAIResponses(id="gpt-5.1")
+
 
 # ------------------------------------------------
 # Agent 1 — Market Data Agent
 # ------------------------------------------------
 
 market_data_agent = Agent(
-    name="Market Data Agent",
+    name="market-data-agent",
     role="Financial Market Data Retrieval Specialist",
-
-    model=OpenAIResponses(id="gpt-5.1"),
-
+    model=MODEL,
     tools=[
         get_current_stock_price,
         get_company_info,
         get_company_news,
-        get_analyst_recommendations
+        get_analyst_recommendations,
     ],
-
     instructions=dedent("""
-You are a financial data analyst responsible for producing
-a structured market snapshot for a given ticker.
+You are a market data specialist.
 
-Always retrieve data using the available tools.
+Use the available tools and return ONLY a compact market snapshot.
 
-The snapshot should include:
+Required output format:
 
-• current price
-• valuation metrics (P/E, P/B, dividend yield, EPS if available)
-• business description
-• recent news headlines
-• analyst recommendation trends
+PRICE
+- Last Price: ...
+- Market Cap: ...
+- Forward P/E: ...
+- Revenue Growth: ...
+- Earnings Growth: ...
 
-Return the output as a structured dataset suitable for
-quantitative research analysis.
+SENTIMENT
+- Analyst Rating: ...
+- Consensus Target Price: ...
 
-Never fabricate numbers.
-If data is unavailable, explicitly say so.
+NEWS
+- ...
+- ...
+- ...
+
+Rules:
+- Never fabricate numbers
+- If unavailable, write "Unavailable"
+- Keep the whole output under 12 lines
+- No extra commentary
 """),
-
     markdown=True,
 )
 
 
 # ------------------------------------------------
-# Agent 2 — Quant Strategy Agent
+# Agent 2 — Quant Strategist
 # ------------------------------------------------
 
-strategy_agent = Agent(
-    name="Quantitative Strategist",
+quant_strategist = Agent(
+    name="quant-strategist",
     role="Hedge Fund Strategy Analyst",
-
-    model=OpenAIResponses(id="gpt-5.1"),
-
+    model=MODEL,
     instructions=dedent("""
-You are a quantitative strategist at a hedge fund.
+You are a quantitative strategist.
 
-Using the structured market snapshot provided by the
-Market Data Agent, construct an investment thesis.
+You will receive a market snapshot from the market-data-agent.
+Use ONLY that snapshot.
 
-Your output should include:
+Return ONLY:
 
-• Investment thesis (1–2 lines)
-• 3–5 supporting arguments
-• Scenario framework:
-  - bull case
-  - base case
-  - bear case
-• Key catalysts (6–24 month horizon)
-• Major risks
-• Suggested positioning (entry zone, horizon, sizing considerations)
+THESIS
+- ...
+- ...
+- ...
 
-Do not fabricate financial data.
-Base reasoning only on the provided snapshot.
+RISKS
+- ...
+- ...
+- ...
+
+HORIZON
+- ... months
+
+Rules:
+- Do not introduce external data
+- Do not fabricate numbers
+- Keep the whole output under 10 lines
+- No extra commentary
 """),
+    markdown=True,
+)
 
+
+# ------------------------------------------------
+# Agent 3 — Portfolio Manager
+# ------------------------------------------------
+
+portfolio_manager = Agent(
+    name="portfolio-manager",
+    role="Portfolio Manager",
+    model=MODEL,
+    instructions=dedent("""
+You are a portfolio manager.
+
+You will receive the strategist output.
+Convert it into a compact portfolio action.
+
+Return ONLY:
+
+SIGNAL
+- LONG / SHORT / NEUTRAL
+
+CONVICTION
+- 0.xx
+
+WEIGHT
+- x%
+
+HORIZON
+- ... months
+
+RATIONALE
+- ...
+- ...
+
+Rules:
+- Keep the whole output under 8 lines
+- No extra commentary
+"""),
     markdown=True,
 )
 
@@ -111,51 +160,41 @@ Base reasoning only on the provided snapshot.
 
 research_team = Team(
     name="AI Hedge Fund Research Team",
-
-    model=OpenAIResponses(id="gpt-5.1"),
-
+    model=MODEL,
     members=[
         market_data_agent,
-        strategy_agent
+        quant_strategist,
+        portfolio_manager,
     ],
-
-    tools=[
-        ReasoningTools(add_instructions=True)
-    ],
-
     instructions=dedent("""
-You orchestrate a deterministic hedge-fund research workflow.
+You orchestrate a STRICT and COMPACT workflow.
 
 Workflow:
+1. Ask market-data-agent for a compact market snapshot.
+2. Pass the FULL snapshot explicitly to quant-strategist.
+3. Pass the FULL strategist output explicitly to portfolio-manager.
+4. Produce the final memo.
 
-1. Ask the Market Data Agent to produce a structured market snapshot.
+Final output must be EXACTLY:
 
-   The snapshot must include:
-   - current price
-   - valuation metrics
-   - business description
-   - analyst sentiment
-   - relevant recent news
+DATA
+<market snapshot>
 
-2. Capture the output from the Market Data Agent.
+INTERPRETATION
+<strategist output>
 
-3. Pass the FULL snapshot explicitly to the Quantitative Strategist.
-
-4. The strategist must produce an investment thesis based strictly
-   on the snapshot.
-
-5. Finally synthesize BOTH outputs into a clean
-   hedge-fund-style research memo.
+PORTFOLIO ACTION
+<portfolio manager output>
 
 Rules:
-
-• Never fabricate missing data
-• Preserve tool outputs exactly
-• Clearly separate DATA vs INTERPRETATION in the final report
+- Maximum 30 lines total
+- Do not ask follow-up questions
+- Do not create extra sections
+- Do not expand into a long memo
+- Do not request spreadsheets, deadlines, attachments, or further deliverables
+- End immediately after PORTFOLIO ACTION
 """),
-
     db=db,
-
     markdown=True,
 )
 
@@ -165,9 +204,8 @@ Rules:
 # ------------------------------------------------
 
 if __name__ == "__main__":
-
     research_team.print_response(
-        "Perform a hedge-fund style research memo for MSFT.",
+        "Analyze MSFT and produce an investment memo.",
         stream=True,
-        show_full_reasoning=True
+        show_full_reasoning=True,
     )

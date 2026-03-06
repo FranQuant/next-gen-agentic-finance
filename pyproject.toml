@@ -27,7 +27,7 @@ dependencies = [
     "tpqoa",
     "fredapi>=0.5.2",
     "tavily-python>=0.7.21",
-    "yfinance>=0.2"
+    "yfinance>=0.2",
 ]
 
 [project.optional-dependencies]
