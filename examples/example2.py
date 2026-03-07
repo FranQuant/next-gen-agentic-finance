@@ -1,39 +1,56 @@
-# Example 2 - Running Agents
-from agno.agent import Agent, RunOutput
-from agno.models.lmstudio import LMStudio
-from agno.tools.duckduckgo import DuckDuckGoTools
+"""Example 2: tool-enabled sentiment scoring over live web news results."""
+
 from textwrap import dedent
 
+from dotenv import load_dotenv
 
-agent = Agent(
-    model=LMStudio(
-        id="meta-llama-3.1-8b-instruct",
-        cache_response=True,
-        cache_ttl=3600,
-    ),
-    tools = [DuckDuckGoTools()],
-    instructions=dedent("""\
-        You are a News Sentiment Decoding Assistant.
+from agno.agent import Agent, RunOutput
+from agno.models.openai import OpenAIResponses
+from agno.tools.tavily import TavilyTools
 
-    When using tools:
-    1. First decide **which tool** to call and output the tool call.
-    2. WAIT for the tool output.
-    3. THEN generate the final answer using the tool results.
-
-    Decode the news and provide the sentiment ranging from +10 (very positive)
-    to -10 (very negative) in a table format with the following columns:
-    Date, Time, News, Source, and Score.
-
-    After the table, provide a point-by-point reasoning explaining how you
-    assigned the sentiment score.
-    """),
-    markdown=True,
-)
+load_dotenv()
 
 
-# use run for production
-response: RunOutput = agent.run("What are the latest news on Gold?")
+def build_agent() -> Agent:
+    return Agent(
+        model=OpenAIResponses(id="gpt-5.2"),
+        tools=[TavilyTools()],
+        instructions=dedent("""\
+            You are a finance news sentiment assistant.
 
-# print the response
-print(response.content)
+            Use the available search tool to find recent news relevant to the user's query.
+            Base your answer on retrieved results rather than invented headlines.
 
+            Return:
+            1. A markdown table with columns:
+               Date | Time | News | Source | Score
+            2. A short reasoning section explaining each score
+
+            Score sentiment from +10 (very positive for the asset)
+            to -10 (very negative for the asset).
+
+            If exact timestamps are unavailable in the retrieved results, use the best
+            available date information and write N/A for missing time fields.
+            Do not fabricate missing metadata.
+
+            Use one row per retrieved news item.
+            Do not merge multiple articles into a single row.
+            Use the source name exactly as it appears in the retrieved result when possible.
+
+            Do not ask follow-up questions.
+            Do not add suggestions, portfolio commentary, or next-step guidance.
+            End the response after the reasoning section.
+        """),
+        markdown=True,
+    )
+
+
+def main() -> None:
+    agent = build_agent()
+    response: RunOutput = agent.run("What are the latest news on gold?")
+    print(response.content)
+
+
+if __name__ == "__main__":
+    main()
+    
