@@ -1,24 +1,49 @@
-from agno.agent import Agent
-from agno.models.lmstudio import LMStudio
 from textwrap import dedent
+from dotenv import load_dotenv
 
-agent = Agent(
-    model=LMStudio(
-        id="meta-llama-3.1-8b-instruct",
-        cache_response=True,
-        cache_ttl=3600,
-    ),
-    instructions=dedent("""\
-        You are a News Sentiment Decoding Assistant.
-        Decode the news and provide the sentiment ranging from +10 (very positive)
-        to -10 (very negative) in a table format with the following columns:
-        Date, Time, News, Source, and Score.
-        
-        After the table, provide a point-by-point reasoning explaining how you
-        assigned the sentiment score.
-    """),
-    markdown=True,
-)
+from agno.agent import Agent
+from agno.models.openai import OpenAIResponses
 
-# only for development
-agent.print_response("what are the latest news on Gold?", stream=True)
+load_dotenv()
+
+"""Example 1: single-agent sentiment scoring over provided finance headlines."""
+
+
+def build_agent() -> Agent:
+    return Agent(
+        model=OpenAIResponses(id="gpt-5.2"),
+        instructions=dedent("""\
+            You are a finance news sentiment assistant.
+
+            Score the provided headlines from +10 (very positive for gold)
+            to -10 (very negative for gold).
+
+            Work only with the headlines given in the prompt.
+            Do not claim you retrieved live news unless a tool is provided.
+
+            Return:
+            1. A markdown table with columns:
+               Date | Time | News | Source | Score
+            2. A short reasoning section for each score.
+        """),
+        markdown=True,
+    )
+
+
+def main() -> None:
+    agent = build_agent()
+    agent.print_response(
+        dedent("""\
+            Analyze the sentiment of these sample gold-market headlines:
+
+            2026-03-07 | 09:10 | Fed signals rate cuts could come sooner as inflation cools | Sample
+            2026-03-07 | 10:05 | US dollar rallies to multi-month high on strong jobs data | Sample
+            2026-03-07 | 11:20 | Geopolitical tensions flare; investors move into safe havens | Sample
+            2026-03-07 | 12:30 | Gold ETF holdings fall for fifth straight week amid risk-on mood | Sample
+        """),
+        stream=True,
+    )
+
+
+if __name__ == "__main__":
+    main()
