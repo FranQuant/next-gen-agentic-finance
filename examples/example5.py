@@ -1,84 +1,83 @@
-# example5.py — LatAm Stocks Agent Demo (Corrected + Agno-Compatible)
+"""Example 5: interactive LatAm stocks SQL agent over a local CSV dataset."""
 
-from agno.agent import Agent
-from agno.tools.csv_toolkit import CsvTools
-from agno.models.lmstudio import LMStudio
 from textwrap import dedent
 
-# ---------------------------------------------------------
-# 1. Load LatAm stocks CSV
-# ---------------------------------------------------------
-csv_tool = CsvTools(
-    csvs=["data/latamstocks.csv"]  # relative path from /examples/
-)
+from dotenv import load_dotenv
 
-# ---------------------------------------------------------
-# 2. Create Agent using LMStudio local model
-# ---------------------------------------------------------
-agent = Agent(
-    model=LMStudio(
-        id="meta-llama-3.1-8b-instruct",
-        cache_response=True,
-        cache_ttl=3600,
-    ),
-    tools=[csv_tool],
+from agno.agent import Agent
+from agno.models.openai import OpenAIResponses
+from agno.tools.csv_toolkit import CsvTools
 
-    instructions=dedent("""
-        You are a DuckDB SQL assistant. Your workflow ALWAYS has two steps:
+load_dotenv()
 
-        STEP 1 — Generate exactly ONE valid DuckDB SQL query following all rules below.
-        STEP 2 — After the SQL query is executed, you ALWAYS:
-            • Read the returned rows.
-            • Display them in a markdown table.
-            • Summarize the main insight.
-            • Provide a final answer to the user using the actual returned data.
-            • Never stop after the tool call. Always continue with analysis.
 
-        IMPORTANT RULES:
-        ----------------
-        • Table name is: latamstocks
-        • Valid column patterns:
-              {TICKER}_Price
-              {TICKER}_Volume
-        • Invalid columns you must NEVER use:
-              Stock, Price, Volume
+def build_agent() -> Agent:
+    csv_tool = CsvTools(csvs=["data/latamstocks.csv"])
 
-        • Date column is named Date and is a DATE type.
+    return Agent(
+        model=OpenAIResponses(id="gpt-5.2"),
+        tools=[csv_tool],
+        instructions=dedent("""\
+            You are a LatAm equities data assistant that uses DuckDB SQL over a local CSV dataset.
 
-        ALLOWED DATE FILTERS:
-            YEAR(Date) = 2020
-            STRFTIME(Date, '%Y') = '2020'
-            Date = DATE '2020-01-15'
+            Your workflow always has two steps:
 
-        DISALLOWED:
-            LIKE, DATE('now'), NOW(), CURRENT_DATE
+            Step 1 — Write exactly one valid DuckDB SQL query.
+            Step 2 — After the query executes:
+                • show the SQL
+                • display the returned rows in a markdown table
+                • summarize the main insight
+                • answer the user using only the returned data
+                • Never stop after the tool call.
 
-        ONE SQL STATEMENT ONLY.
-        NO semicolons.
-        NO multi-query logic.
+            IMPORTANT RULES:
+            • Table name is: latamstocks
+            • Valid column patterns:
+                  {TICKER}_Price
+                  {TICKER}_Volume
+            • Invalid columns you must NEVER use:
+                  Stock, Price, Volume
+            • Date column is named Date and is a DATE type.
 
-        Example valid patterns:
-            SELECT Date, MELI_Price
-            FROM latamstocks
-            ORDER BY Date DESC
-            LIMIT 10
+            ALLOWED DATE FILTERS:
+                YEAR(Date) = 2020
+                STRFTIME(Date, '%Y') = '2020'
+                Date = DATE '2020-01-15'
 
-            SELECT Date,
-                   VALE_Price,
-                   VALE_Price - LAG(VALE_Price) OVER (ORDER BY Date) AS Daily_Return
-            FROM latamstocks
+            DISALLOWED:
+                LIKE, DATE('now'), NOW(), CURRENT_DATE
 
-            SELECT Date, VALE_Volume
-            FROM latamstocks
-            ORDER BY VALE_Volume DESC
-            LIMIT 5
-    """),
+            ONE SQL STATEMENT ONLY.
+            NO semicolons.
+            NO multi-query logic.
 
-    markdown=True,
-)
+            If a requested ticker or column is not available in the dataset,
+            say so clearly and do not guess.
 
-# ---------------------------------------------------------
-# 3. CLI interactive app
-# ---------------------------------------------------------
-if __name__ == "__main__":
+            Example valid patterns:
+                SELECT Date, MELI_Price
+                FROM latamstocks
+                ORDER BY Date DESC
+                LIMIT 10
+
+                SELECT Date,
+                       VALE_Price,
+                       (VALE_Price / LAG(VALE_Price) OVER (ORDER BY Date)) - 1 AS Daily_Return
+                FROM latamstocks
+
+                SELECT Date, VALE_Volume
+                FROM latamstocks
+                ORDER BY VALE_Volume DESC
+                LIMIT 5
+        """),
+        markdown=True,
+    )
+
+
+def main() -> None:
+    agent = build_agent()
     agent.cli_app(stream=True)
+
+
+if __name__ == "__main__":
+    main()
