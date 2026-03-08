@@ -40,9 +40,13 @@ def build_example11_system() -> ResearchOrchestrator:
         macro_regime_agent=MacroRegimeAgent(),
         portfolio_synthesis_agent=PortfolioSynthesisAgent(),
         mcp_web_adapter=MCPWebAdapter(
-            server_url=config.mcp_server_url,
+            server_url=config.mcp_web_server_url,
             timeout_sec=config.mcp_timeout_sec,
             use_live=config.use_mcp_live,
+            transport=config.mcp_web_transport,
+            server_command=config.mcp_web_server_command,
+            server_args=list(config.mcp_web_server_args),
+            tool_name=config.mcp_web_tool_name,
         ),
         mcp_macro_adapter=MCPMacroAdapter(
             server_url=config.mcp_server_url,
