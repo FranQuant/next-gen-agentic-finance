@@ -1,211 +1,193 @@
-# example9.py — Compact Deterministic Multi-Agent Research Demo
+"""Example 9: compact multi-agent research-to-portfolio workflow."""
 
-from dotenv import load_dotenv
-load_dotenv()
-
-from agno.agent import Agent
-from agno.team import Team
-from agno.db.sqlite import SqliteDb
-from agno.models.openai import OpenAIResponses
 from textwrap import dedent
 
-# local financial tools
+from dotenv import load_dotenv
+
+from agno.agent import Agent
+from agno.db.sqlite import SqliteDb
+from agno.models.openai import OpenAIResponses
+from agno.team import Team
+
 from finance_tools import (
     get_current_stock_price,
     get_analyst_recommendations,
     get_company_info,
-    get_company_news,
+    get_company_news_tavily,
 )
 
-# ------------------------------------------------
-# Persistent storage
-# ------------------------------------------------
-
-db = SqliteDb(db_file="tmp/research_team.db")
-
-MODEL = OpenAIResponses(id="gpt-5-mini")
-# swap to gpt-5.1 later if you want higher quality:
-# MODEL = OpenAIResponses(id="gpt-5.1")
+load_dotenv()
 
 
-# ------------------------------------------------
-# Agent 1 — Market Data Agent
-# ------------------------------------------------
+def build_team() -> Team:
+    db = SqliteDb(db_file="tmp/research_team.db")
+    model = OpenAIResponses(id="gpt-5.2")
 
-market_data_agent = Agent(
-    name="market-data-agent",
-    role="Financial Market Data Retrieval Specialist",
-    model=MODEL,
-    tools=[
-        get_current_stock_price,
-        get_company_info,
-        get_company_news,
-        get_analyst_recommendations,
-    ],
-    instructions=dedent("""
-You are a market data specialist.
+    market_data_agent = Agent(
+        name="market-data-agent",
+        role="Financial market data retrieval specialist",
+        model=model,
+        tools=[
+            get_current_stock_price,
+            get_company_info,
+            get_company_news_tavily,
+            get_analyst_recommendations,
+        ],
+        instructions=dedent("""
+            You are a market data specialist.
 
-Use the available tools and return ONLY a compact market snapshot.
+            Use the available tools and return ONLY a compact market snapshot.
 
-Required output format:
+            Required output format:
 
-PRICE
-- Last Price: ...
-- Market Cap: ...
-- Forward P/E: ...
-- Revenue Growth: ...
-- Earnings Growth: ...
+            PRICE
+            - Last Price: ...
+            - Market Cap: ...
+            - Forward P/E: ...
+            - Revenue Growth: ...
+            - Earnings Growth: ...
 
-SENTIMENT
-- Analyst Rating: ...
-- Consensus Target Price: ...
+            SENTIMENT
+            - Analyst Rating: ...
+            - Consensus Target Price: ...
 
-NEWS
-- ...
-- ...
-- ...
+            NEWS
+            - ...
+            - ...
+            - ...
 
-Rules:
-- Never fabricate numbers
-- If unavailable, write "Unavailable"
-- Keep the whole output under 12 lines
-- No extra commentary
-"""),
-    markdown=True,
-)
+            Rules:
+            - Never fabricate numbers
+            - If unavailable, write "Unavailable"
+            - Keep the whole output under 12 lines
+            - No extra commentary
+            - Use company info and Tavily news if available
+        """),
+        markdown=True,
+    )
 
+    quant_strategist = Agent(
+        name="quant-strategist",
+        role="Institutional strategy interpreter",
+        model=model,
+        instructions=dedent("""
+            You are a quantitative strategist.
 
-# ------------------------------------------------
-# Agent 2 — Quant Strategist
-# ------------------------------------------------
+            You will receive a market snapshot from the market-data-agent.
+            Use ONLY that snapshot.
 
-quant_strategist = Agent(
-    name="quant-strategist",
-    role="Hedge Fund Strategy Analyst",
-    model=MODEL,
-    instructions=dedent("""
-You are a quantitative strategist.
+            Return ONLY:
 
-You will receive a market snapshot from the market-data-agent.
-Use ONLY that snapshot.
+            THESIS
+            - ...
+            - ...
+            - ...
 
-Return ONLY:
+            RISKS
+            - ...
+            - ...
+            - ...
 
-THESIS
-- ...
-- ...
-- ...
+            HORIZON
+            - ... months
 
-RISKS
-- ...
-- ...
-- ...
+            Rules:
+            - Do not introduce external data
+            - Do not fabricate numbers
+            - Keep the whole output under 10 lines
+            - No extra commentary
+        """),
+        markdown=True,
+    )
 
-HORIZON
-- ... months
+    portfolio_manager = Agent(
+        name="portfolio-manager",
+        role="Portfolio manager",
+        model=model,
+        instructions=dedent("""
+            You are a portfolio manager.
 
-Rules:
-- Do not introduce external data
-- Do not fabricate numbers
-- Keep the whole output under 10 lines
-- No extra commentary
-"""),
-    markdown=True,
-)
+            You will receive the strategist output.
+            Convert it into a compact portfolio action.
 
+            Return ONLY:
 
-# ------------------------------------------------
-# Agent 3 — Portfolio Manager
-# ------------------------------------------------
+            SIGNAL
+            - LONG / SHORT / NEUTRAL
 
-portfolio_manager = Agent(
-    name="portfolio-manager",
-    role="Portfolio Manager",
-    model=MODEL,
-    instructions=dedent("""
-You are a portfolio manager.
+            CONVICTION
+            - Low / Medium / High
 
-You will receive the strategist output.
-Convert it into a compact portfolio action.
+            WEIGHT
+            - Small / Medium / Large
 
-Return ONLY:
+            HORIZON
+            - ... months
 
-SIGNAL
-- LONG / SHORT / NEUTRAL
+            RATIONALE
+            - ...
+            - ...
 
-CONVICTION
-- 0.xx
+            Rules:
+            - Base the action only on the strategist output
+            - Do not fabricate precise percentages, stops, option costs, or target levels
+            - Keep the whole output under 8 lines
+            - No extra commentary
+        """),
+        markdown=True,
+    )
 
-WEIGHT
-- x%
+    research_team = Team(
+        name="AI Hedge Fund Research Team",
+        model=model,
+        members=[
+            market_data_agent,
+            quant_strategist,
+            portfolio_manager,
+        ],
+        instructions=dedent("""
+            You orchestrate a STRICT and COMPACT workflow.
 
-HORIZON
-- ... months
+            Workflow:
+            1. Ask market-data-agent for a compact market snapshot.
+            2. Pass the FULL snapshot explicitly to quant-strategist.
+            3. Pass the FULL strategist output explicitly to portfolio-manager.
+            4. Produce the final memo.
 
-RATIONALE
-- ...
-- ...
+            Final output must be EXACTLY:
 
-Rules:
-- Keep the whole output under 8 lines
-- No extra commentary
-"""),
-    markdown=True,
-)
+            DATA
+            <market snapshot>
 
+            INTERPRETATION
+            <strategist output>
 
-# ------------------------------------------------
-# Team Coordinator
-# ------------------------------------------------
+            PORTFOLIO ACTION
+            <portfolio manager output>
 
-research_team = Team(
-    name="AI Hedge Fund Research Team",
-    model=MODEL,
-    members=[
-        market_data_agent,
-        quant_strategist,
-        portfolio_manager,
-    ],
-    instructions=dedent("""
-You orchestrate a STRICT and COMPACT workflow.
+            Rules:
+            - Maximum 30 lines total
+            - Do not ask follow-up questions
+            - Do not create extra sections
+            - Do not expand into a long memo
+            - Do not request spreadsheets, deadlines, attachments, or further deliverables
+            - End immediately after PORTFOLIO ACTION
+        """),
+        db=db,
+        markdown=True,
+    )
 
-Workflow:
-1. Ask market-data-agent for a compact market snapshot.
-2. Pass the FULL snapshot explicitly to quant-strategist.
-3. Pass the FULL strategist output explicitly to portfolio-manager.
-4. Produce the final memo.
-
-Final output must be EXACTLY:
-
-DATA
-<market snapshot>
-
-INTERPRETATION
-<strategist output>
-
-PORTFOLIO ACTION
-<portfolio manager output>
-
-Rules:
-- Maximum 30 lines total
-- Do not ask follow-up questions
-- Do not create extra sections
-- Do not expand into a long memo
-- Do not request spreadsheets, deadlines, attachments, or further deliverables
-- End immediately after PORTFOLIO ACTION
-"""),
-    db=db,
-    markdown=True,
-)
+    return research_team
 
 
-# ------------------------------------------------
-# Run the system
-# ------------------------------------------------
-
-if __name__ == "__main__":
+def main() -> None:
+    research_team = build_team()
     research_team.print_response(
-        "Analyze MSFT and produce an investment memo.",
+        "Analyze MSFT and produce a compact investment memo.",
         stream=True,
         show_full_reasoning=True,
     )
+
+
+if __name__ == "__main__":
+    main()
