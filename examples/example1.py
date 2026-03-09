@@ -1,3 +1,5 @@
+"""Example 1: single-agent sentiment scoring over provided finance headlines."""
+
 from textwrap import dedent
 from dotenv import load_dotenv
 
@@ -5,9 +7,6 @@ from agno.agent import Agent
 from agno.models.openai import OpenAIResponses
 
 load_dotenv()
-
-"""Example 1: single-agent sentiment scoring over provided finance headlines."""
-
 
 def build_agent() -> Agent:
     return Agent(
