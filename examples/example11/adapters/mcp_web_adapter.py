@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 try:
     from ..schemas import Evidence
@@ -125,13 +127,23 @@ class _MCPClient:
             if name.lower() == preferred_lower:
                 return name
 
-        candidates = (
-            "web.search",
-            "search",
-            "tavily",
-            "news",
-            "query",
-        )
+        if "extract" in preferred_lower:
+            candidates = (
+                "tavily-extract",
+                "extract",
+                "crawl",
+                "scrape",
+            )
+        else:
+            candidates = (
+                "tavily-search",
+                "web.search",
+                "search",
+                "tavily",
+                "news",
+                "query",
+            )
+
         for keyword in candidates:
             for name in tool_names:
                 if keyword in name.lower():
@@ -141,15 +153,88 @@ class _MCPClient:
 
 
 class MCPWebAdapter:
-    PREFERRED_SOURCES = (
-        "reuters",
-        "bloomberg",
-        "wsj",
-        "ft",
-        "cnbc",
-        "federal reserve",
-        "imf",
+    RESULT_CONTAINER_KEYS = (
+        "results",
+        "items",
+        "documents",
+        "articles",
+        "sources",
+        "data",
     )
+    TITLE_KEYS = (
+        "title",
+        "headline",
+        "name",
+        "page_title",
+        "article_title",
+    )
+    URL_KEYS = (
+        "url",
+        "link",
+        "href",
+        "uri",
+    )
+    SEARCH_SNIPPET_KEYS = (
+        "summary",
+        "snippet",
+        "content",
+        "text",
+        "description",
+        "excerpt",
+        "raw_content",
+        "body",
+        "markdown",
+    )
+    EXTRACT_SNIPPET_KEYS = (
+        "raw_content",
+        "content",
+        "text",
+        "summary",
+        "excerpt",
+        "description",
+        "body",
+        "markdown",
+    )
+    DOMAIN_KEYS = (
+        "domain",
+        "source",
+        "publisher",
+        "site_name",
+        "site",
+        "host",
+        "hostname",
+        "favicon",
+    )
+    SCORE_KEYS = (
+        "score",
+        "relevance",
+        "similarity",
+    )
+    RANK_KEYS = (
+        "rank",
+        "position",
+    )
+    PREFERRED_SOURCES = (
+        "reuters.com",
+        "bloomberg.com",
+        "wsj.com",
+        "ft.com",
+        "cnbc.com",
+        "federalreserve.gov",
+        "imf.org",
+    )
+    SOURCE_DOMAIN_MAP = {
+        "reuters": "reuters.com",
+        "bloomberg": "bloomberg.com",
+        "wsj": "wsj.com",
+        "wall street journal": "wsj.com",
+        "financial times": "ft.com",
+        "ft": "ft.com",
+        "cnbc": "cnbc.com",
+        "federal reserve": "federalreserve.gov",
+        "fed": "federalreserve.gov",
+        "imf": "imf.org",
+    }
 
     def __init__(
         self,
@@ -160,7 +245,9 @@ class MCPWebAdapter:
         transport: str = "stdio",
         server_command: str | None = None,
         server_args: list[str] | None = None,
-        tool_name: str = "web.search",
+        tool_name: str = "tavily-search",
+        extract_tool_name: str = "tavily-extract",
+        enable_extract_enrichment: bool = True,
     ) -> None:
         self.client = _MCPClient(
             server_url=server_url,
@@ -172,15 +259,18 @@ class MCPWebAdapter:
         )
         self.max_results_per_topic = max_results_per_topic
         self.tool_name = tool_name
+        self.extract_tool_name = extract_tool_name
+        self.enable_extract_enrichment = enable_extract_enrichment
+        self.last_search_report = self._empty_search_report()
 
     def search(self, topics: list[str]) -> list[Evidence]:
         if not topics:
             return []
 
+        self.last_search_report = self._empty_search_report(topics)
         evidence: list[Evidence] = []
         for topic in topics:
-            topic_evidence = self._search_topic(topic)
-            evidence.extend(topic_evidence)
+            evidence.extend(self._search_topic(topic))
 
         if not evidence:
             return self._fallback(topics, "MCP web search unavailable; placeholder evidence used.")
@@ -188,58 +278,180 @@ class MCPWebAdapter:
         return self._diversify(evidence, limit=len(topics) * self.max_results_per_topic)
 
     def _search_topic(self, topic: str) -> list[Evidence]:
-        try:
-            response = self.client.call_tool(
-                self.tool_name,
-                {
-                    "query": f"{topic} market research institutional outlook",
-                    "max_results": self.max_results_per_topic * 3,
-                },
-            )
-            if isinstance(response, dict) and response.get("isError"):
-                raise RuntimeError("MCP tool returned an error payload.")
+        query = f"{topic} market research institutional outlook"
+        payloads = [
+            {
+                "query": query,
+                "max_results": self.max_results_per_topic * 4,
+                "search_depth": "advanced",
+                "topic": "general",
+                "include_favicon": True,
+            },
+            {
+                "query": query,
+                "max_results": self.max_results_per_topic * 3,
+                "topic": "general",
+                "include_favicon": True,
+            },
+            {
+                "query": query,
+            },
+        ]
 
-            raw_results = self._extract_raw_results(response, topic)
-            parsed = self._parse_results(raw_results, topic, live=True)
-            if parsed:
-                return parsed[: self.max_results_per_topic]
-        except Exception:
-            pass
+        for payload in payloads:
+            try:
+                response = self.client.call_tool(self.tool_name, payload)
+                if isinstance(response, dict) and response.get("isError"):
+                    self._append_report_entry(
+                        "search_calls",
+                        {
+                            "topic": topic,
+                            "tool": str(response.get("_used_tool") or self.tool_name),
+                            "payload_keys": sorted(payload.keys()),
+                            "error": "error_payload",
+                        },
+                    )
+                    continue
+
+                self.last_search_report["live_mcp_used"] = True
+                records, trace = self._normalize_live_records(response=response, topic=topic)
+                thin = bool(records) and self._is_thin(records)
+                self._append_report_entry(
+                    "search_calls",
+                    {
+                        "topic": topic,
+                        "tool": str(response.get("_used_tool") or self.tool_name),
+                        "payload_keys": sorted(payload.keys()),
+                        "parsed_outputs": trace.get("parsed_outputs", []),
+                        "raw_results": trace.get("raw_results", 0),
+                        "normalized_results": len(records),
+                        "thin": thin,
+                    },
+                )
+                if not records:
+                    continue
+
+                if self.enable_extract_enrichment and thin:
+                    records = self._apply_extract_enrichment(records, topic=topic)
+
+                parsed = self._records_to_evidence(records=records, live=True)
+                if parsed:
+                    return parsed[: self.max_results_per_topic]
+            except Exception as exc:
+                self._append_report_entry(
+                    "search_calls",
+                    {
+                        "topic": topic,
+                        "tool": self.tool_name,
+                        "payload_keys": sorted(payload.keys()),
+                        "error": type(exc).__name__,
+                    },
+                )
+                continue
 
         return self._fallback([topic], "MCP web search unavailable; placeholder evidence used.")
+
+    def _normalize_live_records(
+        self,
+        response: dict[str, Any],
+        topic: str,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        response_answer = self._extract_response_answer(response)
+        raw_results = self._extract_raw_results(response=response, topic=topic)
+        if not raw_results:
+            return [], {"parsed_outputs": [], "raw_results": 0}
+
+        records: list[dict[str, Any]] = []
+        origins: set[str] = set()
+        seen: set[str] = set()
+        for item in raw_results:
+            if not isinstance(item, dict):
+                continue
+
+            origin = self._clean_text(item.get("_origin"))
+            if origin:
+                origins.add(origin)
+
+            normalized = self._normalize_result_item(
+                item=item,
+                topic=topic,
+                fallback_snippet=response_answer,
+                snippet_keys=self.SEARCH_SNIPPET_KEYS,
+            )
+            if not normalized:
+                continue
+
+            key = (str(normalized.get("url") or normalized.get("title") or "")).lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            records.append(normalized)
+
+        return (
+            sorted(records, key=self._record_rank, reverse=True),
+            {
+                "parsed_outputs": sorted(origins),
+                "raw_results": len(raw_results),
+            },
+        )
 
     def _extract_raw_results(self, response: dict[str, Any], topic: str) -> list[dict[str, Any]]:
         if not isinstance(response, dict):
             return []
 
-        direct = response.get("results")
-        if isinstance(direct, list):
-            return [item for item in direct if isinstance(item, dict)]
-
-        structured = response.get("structuredContent")
-        structured_items = self._extract_structured_items(structured)
+        structured_items = self._extract_structured_items(response.get("structuredContent"), origin="structuredContent")
         if structured_items:
             return structured_items
 
-        content = response.get("content")
-        content_items = self._extract_content_items(content, topic=topic)
+        direct = response.get("results")
+        if isinstance(direct, list):
+            return [self._with_origin(item, "results") for item in direct if isinstance(item, dict)]
+
+        content_items = self._extract_content_items(response.get("content"), topic=topic)
         if content_items:
             return content_items
 
         return []
 
-    def _extract_structured_items(self, structured: Any) -> list[dict[str, Any]]:
+    def _extract_structured_items(
+        self,
+        structured: Any,
+        origin: str = "structuredContent",
+        depth: int = 0,
+    ) -> list[dict[str, Any]]:
+        if depth > 5:
+            return []
+
         if isinstance(structured, list):
-            return [item for item in structured if isinstance(item, dict)]
+            items: list[dict[str, Any]] = []
+            for idx, item in enumerate(structured):
+                if not isinstance(item, dict):
+                    continue
+                if self._looks_like_result_item(item):
+                    items.append(self._with_origin(item, origin))
+                    continue
+                items.extend(self._extract_structured_items(item, origin=f"{origin}[{idx}]", depth=depth + 1))
+            return items
 
         if isinstance(structured, dict):
-            for key in ("results", "items", "documents", "articles", "data"):
+            items: list[dict[str, Any]] = []
+            for key in self.RESULT_CONTAINER_KEYS:
                 maybe = structured.get(key)
-                if isinstance(maybe, list):
-                    return [item for item in maybe if isinstance(item, dict)]
+                if maybe is None:
+                    continue
+                items.extend(self._extract_structured_items(maybe, origin=f"{origin}.{key}", depth=depth + 1))
+            if items:
+                return items
 
-            if any(key in structured for key in ("title", "summary", "content", "text", "url")):
-                return [structured]
+            if self._looks_like_result_item(structured):
+                return [self._with_origin(structured, origin)]
+
+            for key, value in structured.items():
+                if not isinstance(value, (dict, list)):
+                    continue
+                items.extend(self._extract_structured_items(value, origin=f"{origin}.{key}", depth=depth + 1))
+            if items:
+                return items
 
         return []
 
@@ -256,65 +468,264 @@ class MCPWebAdapter:
             else:
                 block_data = {}
 
-            if block_data.get("type") != "text":
+            block_type = str(block_data.get("type", "")).strip().lower()
+
+            if block_type == "text" or block_data.get("text") is not None:
+                text = self._flatten_text(block_data.get("text"))
+                if not text:
+                    continue
+                items.extend(self._parse_text_payload(text=text, topic=topic, origin="content.text"))
                 continue
 
-            text = str(block_data.get("text", "")).strip()
-            if not text:
-                continue
-
-            parsed = self._parse_text_payload(text, topic)
-            items.extend(parsed)
+            if block_type == "resource":
+                resource = block_data.get("resource")
+                if isinstance(resource, dict):
+                    resource_url = self._pick_first_url(resource)
+                    resource_text = self._flatten_text(resource.get("text") or resource.get("contents"))
+                    if resource_url or resource_text:
+                        items.append(
+                            {
+                                "title": topic,
+                                "url": resource_url,
+                                "content": resource_text,
+                                "source": self._extract_domain(resource_url) or "web",
+                                "_origin": "content.resource",
+                            }
+                        )
 
         return items
 
-    def _parse_text_payload(self, text: str, topic: str) -> list[dict[str, Any]]:
+    def _parse_text_payload(self, text: str, topic: str, origin: str) -> list[dict[str, Any]]:
         try:
             payload = json.loads(text)
         except Exception:
-            return [{"title": topic, "summary": text, "source": "web"}]
+            return [{"title": topic, "summary": text, "source": "web", "_origin": f"{origin}.raw"}]
 
         if isinstance(payload, list):
-            return [item for item in payload if isinstance(item, dict)]
+            return [self._with_origin(item, f"{origin}.json") for item in payload if isinstance(item, dict)]
+
         if isinstance(payload, dict):
-            nested = self._extract_structured_items(payload)
+            nested = self._extract_structured_items(payload, origin=f"{origin}.json")
             if nested:
                 return nested
-            return [payload]
-        return [{"title": topic, "summary": text, "source": "web"}]
+            return [self._with_origin(payload, f"{origin}.json")]
 
-    def _parse_results(self, results: list[dict[str, Any]], topic: str, live: bool) -> list[Evidence]:
-        parsed: list[Evidence] = []
-        for item in results:
-            title = str(item.get("title") or item.get("headline") or topic).strip()
-            summary = str(
-                item.get("summary")
-                or item.get("content")
-                or item.get("text")
-                or item.get("snippet")
-                or ""
-            ).strip()
-            source = str(item.get("source") or item.get("publisher") or "web").strip().lower()
-            score = float(item.get("score") or item.get("relevance") or 0.6)
+        return [{"title": topic, "summary": text, "source": "web", "_origin": f"{origin}.raw"}]
 
-            prefix = "mcp-live" if live else "mcp-fallback"
-            parsed.append(
+    def _is_thin(self, records: list[dict[str, Any]]) -> bool:
+        if len(records) < self.max_results_per_topic:
+            return True
+
+        top = records[: self.max_results_per_topic]
+        snippet_lengths = [len(str(item.get("snippet", "")).strip()) for item in top]
+        avg_len = sum(snippet_lengths) / max(1, len(snippet_lengths))
+        return avg_len < 80
+
+    def _apply_extract_enrichment(self, records: list[dict[str, Any]], topic: str) -> list[dict[str, Any]]:
+        candidate_urls = list(
+            dict.fromkeys(
+                str(item.get("url", "")).strip()
+                for item in records[: max(2, self.max_results_per_topic)]
+                if str(item.get("url", "")).strip()
+            )
+        )
+        if not candidate_urls:
+            return records
+
+        enrichment_map = self._fetch_extract_map(candidate_urls, topic=topic)
+        if not enrichment_map:
+            return records
+
+        enriched: list[dict[str, Any]] = []
+        for item in records:
+            cloned = dict(item)
+            url = str(cloned.get("url", "")).strip()
+            extract_record = enrichment_map.get(url)
+            if not extract_record:
+                enriched.append(cloned)
+                continue
+
+            updated = False
+            extracted_title = self._clean_text(extract_record.get("title") or "")
+            extracted_text = self._clean_text(extract_record.get("snippet") or "")
+            extracted_domain = self._clean_text(extract_record.get("domain") or "")
+            current_title = self._clean_text(cloned.get("title") or "")
+            current_snippet = self._clean_text(cloned.get("snippet") or "")
+            current_domain = self._clean_text(cloned.get("domain") or "web").lower()
+
+            if extracted_title and self._is_generic_title(current_title, topic):
+                cloned["title"] = extracted_title
+                updated = True
+            if extracted_text and len(current_snippet) < max(120, len(extracted_text) // 2):
+                cloned["snippet"] = extracted_text[:280]
+                updated = True
+            if extracted_domain and current_domain == "web":
+                cloned["domain"] = extracted_domain
+                updated = True
+            if updated:
+                cloned["extract_enriched"] = True
+                cloned["relevance"] = min(1.0, float(cloned.get("relevance", 0.6)) + 0.05)
+                self.last_search_report["extract_enrichment_used"] = True
+            enriched.append(cloned)
+
+        return enriched
+
+    def _fetch_extract_map(self, urls: list[str], topic: str) -> dict[str, dict[str, Any]]:
+        payloads: list[dict[str, Any]] = [
+            {
+                "urls": urls,
+                "query": topic,
+                "extract_depth": "advanced",
+                "format": "text",
+                "include_favicon": True,
+            },
+            {
+                "urls": urls,
+                "query": topic,
+                "format": "text",
+                "include_favicon": True,
+            },
+            {
+                "urls": urls,
+                "extract_depth": "advanced",
+                "format": "text",
+                "include_favicon": True,
+            },
+            {
+                "urls": urls[:1],
+            },
+        ]
+
+        for payload in payloads:
+            try:
+                response = self.client.call_tool(self.extract_tool_name, payload)
+                if isinstance(response, dict) and response.get("isError"):
+                    self._append_report_entry(
+                        "extract_calls",
+                        {
+                            "tool": str(response.get("_used_tool") or self.extract_tool_name),
+                            "payload_keys": sorted(payload.keys()),
+                            "error": "error_payload",
+                        },
+                    )
+                    continue
+
+                mapping, trace = self._parse_extract_response(response)
+                self._append_report_entry(
+                    "extract_calls",
+                    {
+                        "tool": str(response.get("_used_tool") or self.extract_tool_name),
+                        "payload_keys": sorted(payload.keys()),
+                        "parsed_outputs": trace.get("parsed_outputs", []),
+                        "raw_results": trace.get("raw_results", 0),
+                        "normalized_results": len(mapping),
+                    },
+                )
+                if mapping:
+                    return mapping
+            except Exception as exc:
+                self._append_report_entry(
+                    "extract_calls",
+                    {
+                        "tool": self.extract_tool_name,
+                        "payload_keys": sorted(payload.keys()),
+                        "error": type(exc).__name__,
+                    },
+                )
+                continue
+
+        return {}
+
+    def _parse_extract_response(
+        self,
+        response: dict[str, Any],
+    ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+        if not isinstance(response, dict):
+            return {}, {"parsed_outputs": [], "raw_results": 0}
+
+        raw_items = self._extract_raw_results(response=response, topic="extract")
+        mapping: dict[str, dict[str, Any]] = {}
+        origins: set[str] = set()
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+
+            origin = self._clean_text(item.get("_origin"))
+            if origin:
+                origins.add(origin)
+
+            normalized = self._normalize_result_item(
+                item=item,
+                topic="extract",
+                snippet_keys=self.EXTRACT_SNIPPET_KEYS,
+            )
+            if not normalized:
+                continue
+
+            url = str(normalized.get("url") or "").strip()
+            if url:
+                mapping[url] = normalized
+
+        return mapping, {"parsed_outputs": sorted(origins), "raw_results": len(raw_items)}
+
+    def _records_to_evidence(self, records: list[dict[str, Any]], live: bool) -> list[Evidence]:
+        prefix = "mcp-live" if live else "mcp-fallback"
+        evidence: list[Evidence] = []
+
+        for item in records:
+            domain = self._canonical_domain(str(item.get("domain") or "web").lower()) or "web"
+            title = self._clean_text(item.get("title") or "Untitled")
+            url = self._clean_text(item.get("url") or "")
+            snippet = self._clean_text(item.get("snippet") or "")
+            relevance = self._coerce_score(item.get("relevance"))
+
+            evidence.append(
                 Evidence(
-                    source=f"{prefix}:{source}",
+                    source=f"{prefix}:{domain}",
                     title=title,
-                    summary=summary[:280],
-                    url=str(item.get("url") or item.get("link") or ""),
+                    summary=snippet[:280],
+                    url=url,
                     timestamp=self._now_iso(),
-                    relevance=min(1.0, max(0.1, score)),
+                    relevance=relevance,
                 )
             )
 
-        return sorted(parsed, key=self._rank_evidence, reverse=True)
+        return sorted(evidence, key=self._rank_evidence, reverse=True)
+
+    def _normalize_result_item(
+        self,
+        item: dict[str, Any],
+        topic: str,
+        fallback_snippet: str = "",
+        snippet_keys: tuple[str, ...] | None = None,
+    ) -> dict[str, Any] | None:
+        snippet_fields = snippet_keys or self.SEARCH_SNIPPET_KEYS
+        title = self._pick_first_text(item, self.TITLE_KEYS)
+        url = self._pick_first_url(item)
+        snippet = self._pick_first_text(item, snippet_fields)
+        if not snippet and fallback_snippet:
+            snippet = fallback_snippet
+
+        domain = self._infer_domain(item=item, url=url)
+        if not title:
+            title = topic or self._domain_label(domain) or "Untitled"
+
+        if not any((title, url, snippet)):
+            return None
+
+        return {
+            "title": self._clean_text(title),
+            "url": self._clean_text(url),
+            "snippet": self._clean_text(snippet),
+            "domain": domain or "web",
+            "relevance": self._extract_relevance(item),
+            "_origin": self._clean_text(item.get("_origin")),
+        }
 
     def _rank_evidence(self, item: Evidence) -> float:
         source_name = self._source_name(item.source)
         source_boost = 0.0
-        if any(name in source_name for name in self.PREFERRED_SOURCES):
+        if any(source_name.endswith(preferred) for preferred in self.PREFERRED_SOURCES):
             source_boost = 0.4
         content_boost = min(len(item.summary) / 500.0, 0.2)
         return item.relevance + source_boost + content_boost
@@ -350,13 +761,270 @@ class MCPWebAdapter:
             return parts[1].lower()
         return source.lower()
 
+    def _infer_domain(self, item: dict[str, Any], url: str) -> str:
+        url_domain = self._extract_domain(url)
+        if url_domain:
+            return url_domain
+
+        for key in self.DOMAIN_KEYS:
+            domain = self._domain_from_value(item.get(key))
+            if domain:
+                return domain
+
+        return "web"
+
+    def _extract_domain(self, url: str) -> str:
+        normalized_url = self._normalize_url(url)
+        if not normalized_url:
+            return ""
+
+        parsed = urlparse(normalized_url if "://" in normalized_url else f"https://{normalized_url}")
+        domain = self._canonical_domain((parsed.netloc or "").lower().strip())
+        if domain.startswith("www."):
+            domain = domain[4:]
+        return domain
+
+    def _extract_relevance(self, item: dict[str, Any]) -> float:
+        for key in self.SCORE_KEYS:
+            number = self._coerce_float(item.get(key))
+            if number is not None:
+                return self._coerce_score(number)
+
+        for key in self.RANK_KEYS:
+            number = self._coerce_float(item.get(key))
+            if number is not None:
+                bounded_rank = max(1.0, number)
+                return self._coerce_score(1.0 / bounded_rank)
+
+        return 0.6
+
+    def _pick_first_text(self, item: dict[str, Any], keys: tuple[str, ...]) -> str:
+        for key in keys:
+            if key not in item:
+                continue
+            text = self._flatten_text(item.get(key))
+            if text:
+                return text
+        return ""
+
+    def _pick_first_url(self, item: dict[str, Any]) -> str:
+        for key in self.URL_KEYS:
+            if key not in item:
+                continue
+            url = self._normalize_url(item.get(key))
+            if url:
+                return url
+
+        resource = item.get("resource")
+        if isinstance(resource, dict):
+            for key in self.URL_KEYS:
+                if key not in resource:
+                    continue
+                url = self._normalize_url(resource.get(key))
+                if url:
+                    return url
+
+        return ""
+
+    def _flatten_text(self, value: Any) -> str:
+        if value is None:
+            return ""
+
+        if isinstance(value, str):
+            return self._clean_text(value)
+
+        if isinstance(value, (int, float, bool)):
+            return self._clean_text(value)
+
+        if isinstance(value, list):
+            parts: list[str] = []
+            for item in value:
+                text = self._flatten_text(item)
+                if not text:
+                    continue
+                parts.append(text)
+                if len(parts) >= 3:
+                    break
+            return self._clean_text(" ".join(parts))
+
+        if isinstance(value, dict):
+            if value.get("type") == "text":
+                return self._flatten_text(value.get("text"))
+
+            for key in self.EXTRACT_SNIPPET_KEYS + self.TITLE_KEYS:
+                if key not in value:
+                    continue
+                text = self._flatten_text(value.get(key))
+                if text:
+                    return text
+
+        return ""
+
+    def _normalize_url(self, value: Any) -> str:
+        if value is None:
+            return ""
+
+        if isinstance(value, list):
+            for item in value:
+                url = self._normalize_url(item)
+                if url:
+                    return url
+            return ""
+
+        if isinstance(value, dict):
+            for key in self.URL_KEYS:
+                if key not in value:
+                    continue
+                url = self._normalize_url(value.get(key))
+                if url:
+                    return url
+            return ""
+
+        candidate = self._clean_text(value).rstrip(").,]")
+        if not candidate:
+            return ""
+
+        match = re.search(r"https?://\S+", candidate)
+        if match:
+            candidate = match.group(0).rstrip(").,]")
+
+        if candidate.startswith(("http://", "https://")):
+            return candidate
+
+        if "." in candidate and " " not in candidate:
+            return candidate
+
+        return ""
+
+    def _domain_from_value(self, value: Any) -> str:
+        candidate = self._clean_text(value).lower()
+        if not candidate:
+            return ""
+
+        candidate = candidate.removeprefix("mcp-live:").removeprefix("mcp-fallback:")
+        parsed_like_url = self._extract_domain(candidate)
+        if parsed_like_url:
+            return parsed_like_url
+
+        direct_map = self.SOURCE_DOMAIN_MAP.get(candidate)
+        if direct_map:
+            return direct_map
+
+        compact = candidate.replace(" ", "")
+        direct_map = self.SOURCE_DOMAIN_MAP.get(compact)
+        if direct_map:
+            return direct_map
+
+        stripped = candidate.removeprefix("the ").strip()
+        direct_map = self.SOURCE_DOMAIN_MAP.get(stripped)
+        if direct_map:
+            return direct_map
+
+        for alias, mapped_domain in self.SOURCE_DOMAIN_MAP.items():
+            if alias in candidate:
+                return mapped_domain
+
+        if "." in candidate and " " not in candidate:
+            return self._canonical_domain(candidate)
+
+        return ""
+
+    def _canonical_domain(self, domain: str) -> str:
+        normalized = domain.lower().strip()
+        if normalized.startswith("www."):
+            normalized = normalized[4:]
+        for preferred in self.PREFERRED_SOURCES:
+            if normalized == preferred or normalized.endswith(f".{preferred}"):
+                return preferred
+        return normalized
+
+    def _domain_label(self, domain: str) -> str:
+        normalized = self._canonical_domain(domain)
+        return normalized or "Untitled"
+
+    def _looks_like_result_item(self, item: dict[str, Any]) -> bool:
+        has_url = any(self._normalize_url(item.get(key)) for key in self.URL_KEYS if key in item)
+        has_title = any(self._flatten_text(item.get(key)) for key in self.TITLE_KEYS if key in item)
+        has_domain = any(self._domain_from_value(item.get(key)) for key in self.DOMAIN_KEYS if key in item)
+        has_snippet = any(self._flatten_text(item.get(key)) for key in self.SEARCH_SNIPPET_KEYS if key in item)
+        return has_url or has_title or (has_domain and has_snippet)
+
+    def _with_origin(self, item: dict[str, Any], origin: str) -> dict[str, Any]:
+        annotated = dict(item)
+        annotated.setdefault("_origin", origin)
+        return annotated
+
+    def _append_report_entry(self, bucket: str, payload: dict[str, Any]) -> None:
+        entries = self.last_search_report.setdefault(bucket, [])
+        if isinstance(entries, list):
+            entries.append(payload)
+
+    def _empty_search_report(self, topics: list[str] | None = None) -> dict[str, Any]:
+        return {
+            "topics": list(topics or []),
+            "live_mcp_used": False,
+            "fallback_used": False,
+            "extract_enrichment_used": False,
+            "search_calls": [],
+            "extract_calls": [],
+        }
+
+    def _extract_response_answer(self, response: dict[str, Any]) -> str:
+        if not isinstance(response, dict):
+            return ""
+
+        structured = response.get("structuredContent")
+        if isinstance(structured, dict):
+            answer = self._pick_first_text(structured, ("answer", "response"))
+            if answer:
+                return answer
+
+        return self._pick_first_text(response, ("answer", "response"))
+
+    def _record_rank(self, item: dict[str, Any]) -> float:
+        domain = self._canonical_domain(str(item.get("domain") or "web").lower())
+        source_boost = 0.4 if any(domain.endswith(preferred) for preferred in self.PREFERRED_SOURCES) else 0.0
+        snippet = self._clean_text(item.get("snippet") or "")
+        content_boost = min(len(snippet) / 500.0, 0.2)
+        relevance = self._coerce_score(item.get("relevance"))
+        enriched_boost = 0.05 if item.get("extract_enriched") else 0.0
+        return relevance + source_boost + content_boost + enriched_boost
+
+    def _is_generic_title(self, title: str, topic: str) -> bool:
+        normalized = self._clean_text(title).lower()
+        if not normalized:
+            return True
+        if normalized in {"untitled", "extract"}:
+            return True
+        return normalized == self._clean_text(topic).lower()
+
+    def _coerce_score(self, value: Any) -> float:
+        try:
+            num = float(value)
+        except Exception:
+            num = 0.6
+        return min(1.0, max(0.1, num))
+
+    def _coerce_float(self, value: Any) -> float | None:
+        try:
+            return float(value)
+        except Exception:
+            return None
+
+    def _clean_text(self, value: Any) -> str:
+        if value is None:
+            return ""
+        text = str(value).strip()
+        return " ".join(text.split())
+
     def _fallback(self, topics: list[str], note: str) -> list[Evidence]:
+        self.last_search_report["fallback_used"] = True
         source_cycle = [
-            "mcp-fallback:reuters",
-            "mcp-fallback:bloomberg",
-            "mcp-fallback:federal reserve",
-            "mcp-fallback:imf",
-            "mcp-fallback:wsj",
+            "mcp-fallback:reuters.com",
+            "mcp-fallback:bloomberg.com",
+            "mcp-fallback:federalreserve.gov",
+            "mcp-fallback:imf.org",
+            "mcp-fallback:wsj.com",
         ]
 
         fallback: list[Evidence] = []
