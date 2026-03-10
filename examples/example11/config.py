@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import os
 import shlex
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from urllib.parse import quote_plus
 
 
@@ -28,6 +30,11 @@ class Example11Config:
     mcp_web_tool_name: str = "tavily-search"
     mcp_web_extract_tool_name: str = "tavily-extract"
     mcp_web_enable_extract_enrichment: bool = True
+    mcp_macro_transport: str = "stdio"
+    mcp_macro_server_url: str | None = None
+    mcp_macro_server_command: str | None = None
+    mcp_macro_server_args: tuple[str, ...] = ()
+    mcp_macro_tool_name: str = "macro.get_state"
 
 
 def _parse_bool_env(raw: str | None, default: bool = False) -> bool:
@@ -43,19 +50,42 @@ def _infer_tavily_mcp_url() -> str | None:
     return f"https://mcp.tavily.com/mcp/?tavilyApiKey={quote_plus(api_key)}"
 
 
+def _infer_macro_server_command() -> tuple[str | None, tuple[str, ...]]:
+    if not (os.getenv("FRED_API_KEY") or "").strip():
+        return None, ()
+
+    server_path = Path(__file__).resolve().parent / "adapters" / "mcp_macro_server.py"
+    if not server_path.exists():
+        return None, ()
+
+    return sys.executable, (str(server_path),)
+
+
 def load_config() -> Example11Config:
     use_mcp_live_raw = os.getenv("EXAMPLE11_USE_MCP_LIVE")
     mcp_server_url = os.getenv("EXAMPLE11_MCP_SERVER_URL")
     inferred_tavily_url = _infer_tavily_mcp_url()
+    inferred_macro_command, inferred_macro_args = _infer_macro_server_command()
     explicit_web_server_url = os.getenv("EXAMPLE11_MCP_WEB_SERVER_URL")
     explicit_web_server_command = os.getenv("EXAMPLE11_MCP_WEB_SERVER_COMMAND")
     resolved_web_server_url = explicit_web_server_url or mcp_server_url or inferred_tavily_url
     default_web_transport = "streamable_http" if resolved_web_server_url else "stdio"
+    explicit_macro_server_url = os.getenv("EXAMPLE11_MCP_MACRO_SERVER_URL")
+    explicit_macro_server_command = os.getenv("EXAMPLE11_MCP_MACRO_SERVER_COMMAND")
+    resolved_macro_server_url = explicit_macro_server_url
+    resolved_macro_server_command = explicit_macro_server_command or inferred_macro_command
+    default_macro_transport = "stdio" if resolved_macro_server_command else "streamable_http" if resolved_macro_server_url else "stdio"
     use_mcp_live = _parse_bool_env(
         use_mcp_live_raw,
-        default=bool(resolved_web_server_url or explicit_web_server_command),
+        default=bool(
+            resolved_web_server_url
+            or explicit_web_server_command
+            or resolved_macro_server_url
+            or resolved_macro_server_command
+        ),
     )
     mcp_web_args_raw = os.getenv("EXAMPLE11_MCP_WEB_SERVER_ARGS", "")
+    mcp_macro_args_raw = os.getenv("EXAMPLE11_MCP_MACRO_SERVER_ARGS", "")
     enable_extract = _parse_bool_env(os.getenv("EXAMPLE11_MCP_WEB_ENABLE_EXTRACT_ENRICHMENT"), default=True)
 
     return Example11Config(
@@ -74,4 +104,11 @@ def load_config() -> Example11Config:
             os.getenv("EXAMPLE11_MCP_WEB_EXTRACT_TOOL_NAME", "tavily-extract").strip() or "tavily-extract"
         ),
         mcp_web_enable_extract_enrichment=enable_extract,
+        mcp_macro_transport=(os.getenv("EXAMPLE11_MCP_MACRO_TRANSPORT") or default_macro_transport).strip().lower(),
+        mcp_macro_server_url=resolved_macro_server_url,
+        mcp_macro_server_command=resolved_macro_server_command,
+        mcp_macro_server_args=tuple(shlex.split(mcp_macro_args_raw))
+        if mcp_macro_args_raw
+        else inferred_macro_args if not explicit_macro_server_command else (),
+        mcp_macro_tool_name=(os.getenv("EXAMPLE11_MCP_MACRO_TOOL_NAME", "macro.get_state").strip() or "macro.get_state"),
     )
