@@ -221,7 +221,29 @@ class MCPWebAdapter:
         "ft.com",
         "cnbc.com",
         "federalreserve.gov",
+        "fred.stlouisfed.org",
         "imf.org",
+        "bis.org",
+        "worldbank.org",
+        "invesco.com",
+        "blackrock.com",
+        "ishares.com",
+        "nomuranow.com",
+        "jpmorgan.com",
+        "goldmansachs.com",
+        "gs.com",
+    )
+    LOW_QUALITY_DOMAINS = (
+        "bitget.com",
+        "tickeron.com",
+        "gurufocus.com",
+        "rollingout.com",
+        "walletinvestor.com",
+        "gov.capital",
+        "coinpriceforecast.com",
+        "stockinvest.us",
+        "longforecast.com",
+        "marketbeat.com",
     )
     SOURCE_DOMAIN_MAP = {
         "reuters": "reuters.com",
@@ -234,6 +256,18 @@ class MCPWebAdapter:
         "federal reserve": "federalreserve.gov",
         "fed": "federalreserve.gov",
         "imf": "imf.org",
+        "bis": "bis.org",
+        "bank for international settlements": "bis.org",
+        "world bank": "worldbank.org",
+        "invesco": "invesco.com",
+        "blackrock": "blackrock.com",
+        "ishares": "ishares.com",
+        "nomura": "nomuranow.com",
+        "j.p. morgan": "jpmorgan.com",
+        "jp morgan": "jpmorgan.com",
+        "jpmorgan": "jpmorgan.com",
+        "goldman sachs": "goldmansachs.com",
+        "goldman": "goldmansachs.com",
     }
 
     def __init__(
@@ -277,28 +311,60 @@ class MCPWebAdapter:
 
         return self._diversify(evidence, limit=len(topics) * self.max_results_per_topic)
 
+    def _build_queries(self, topic: str) -> list[str]:
+        focus = self._topic_focus(topic)
+        if self._looks_like_asset_topic(topic, focus):
+            variants = [
+                f"{focus} institutional outlook",
+                f"{focus} macro outlook",
+                f"{focus} investment outlook",
+                f"{focus} strategy outlook",
+            ]
+        else:
+            variants = [
+                f"{focus} institutional market outlook",
+                f"{focus} macro outlook",
+                f"{focus} investment strategy outlook",
+            ]
+
+        queries: list[str] = []
+        for query in variants:
+            cleaned = self._clean_text(query)
+            if cleaned and cleaned not in queries:
+                queries.append(cleaned)
+        return queries or [self._clean_text(topic)]
+
+    def _build_search_payloads(self, topic: str) -> list[dict[str, Any]]:
+        payloads: list[dict[str, Any]] = []
+        for query in self._build_queries(topic):
+            payloads.append(
+                {
+                    "query": query,
+                    "max_results": self.max_results_per_topic * 4,
+                    "search_depth": "advanced",
+                    "topic": "general",
+                    "include_favicon": True,
+                    "include_domains": list(self.PREFERRED_SOURCES),
+                    "exclude_domains": list(self.LOW_QUALITY_DOMAINS),
+                }
+            )
+            payloads.append(
+                {
+                    "query": query,
+                    "max_results": self.max_results_per_topic * 3,
+                    "topic": "general",
+                    "include_favicon": True,
+                    "exclude_domains": list(self.LOW_QUALITY_DOMAINS),
+                }
+            )
+            payloads.append({"query": query})
+        return payloads
+
     def _search_topic(self, topic: str) -> list[Evidence]:
-        query = f"{topic} market research institutional outlook"
-        payloads = [
-            {
-                "query": query,
-                "max_results": self.max_results_per_topic * 4,
-                "search_depth": "advanced",
-                "topic": "general",
-                "include_favicon": True,
-            },
-            {
-                "query": query,
-                "max_results": self.max_results_per_topic * 3,
-                "topic": "general",
-                "include_favicon": True,
-            },
-            {
-                "query": query,
-            },
-        ]
+        payloads = self._build_search_payloads(topic)
 
         for payload in payloads:
+            query = self._clean_text(payload.get("query") or topic)
             try:
                 response = self.client.call_tool(self.tool_name, payload)
                 if isinstance(response, dict) and response.get("isError"):
@@ -306,6 +372,7 @@ class MCPWebAdapter:
                         "search_calls",
                         {
                             "topic": topic,
+                            "query": query,
                             "tool": str(response.get("_used_tool") or self.tool_name),
                             "payload_keys": sorted(payload.keys()),
                             "error": "error_payload",
@@ -315,23 +382,24 @@ class MCPWebAdapter:
 
                 self.last_search_report["live_mcp_used"] = True
                 records, trace = self._normalize_live_records(response=response, topic=topic)
-                thin = bool(records) and self._is_thin(records)
+                needs_extract = bool(records) and self._needs_extract_enrichment(records)
                 self._append_report_entry(
                     "search_calls",
                     {
                         "topic": topic,
+                        "query": query,
                         "tool": str(response.get("_used_tool") or self.tool_name),
                         "payload_keys": sorted(payload.keys()),
                         "parsed_outputs": trace.get("parsed_outputs", []),
                         "raw_results": trace.get("raw_results", 0),
                         "normalized_results": len(records),
-                        "thin": thin,
+                        "needs_extract": needs_extract,
                     },
                 )
                 if not records:
                     continue
 
-                if self.enable_extract_enrichment and thin:
+                if self.enable_extract_enrichment and needs_extract:
                     records = self._apply_extract_enrichment(records, topic=topic)
 
                 parsed = self._records_to_evidence(records=records, live=True)
@@ -342,6 +410,7 @@ class MCPWebAdapter:
                     "search_calls",
                     {
                         "topic": topic,
+                        "query": query,
                         "tool": self.tool_name,
                         "payload_keys": sorted(payload.keys()),
                         "error": type(exc).__name__,
@@ -387,6 +456,7 @@ class MCPWebAdapter:
             seen.add(key)
             records.append(normalized)
 
+        records = self._prune_low_quality_records(records)
         return (
             sorted(records, key=self._record_rank, reverse=True),
             {
@@ -519,16 +589,23 @@ class MCPWebAdapter:
         top = records[: self.max_results_per_topic]
         snippet_lengths = [len(str(item.get("snippet", "")).strip()) for item in top]
         avg_len = sum(snippet_lengths) / max(1, len(snippet_lengths))
-        return avg_len < 80
+        return avg_len < 120
+
+    def _needs_extract_enrichment(self, records: list[dict[str, Any]]) -> bool:
+        if self._is_thin(records):
+            return True
+
+        top = records[: min(3, len(records))]
+        weak_items = 0
+        for item in top:
+            domain = self._clean_text(item.get("domain") or "").lower()
+            snippet_len = len(self._clean_text(item.get("snippet") or ""))
+            if self._is_low_quality_domain(domain) or snippet_len < 180:
+                weak_items += 1
+        return weak_items >= 2
 
     def _apply_extract_enrichment(self, records: list[dict[str, Any]], topic: str) -> list[dict[str, Any]]:
-        candidate_urls = list(
-            dict.fromkeys(
-                str(item.get("url", "")).strip()
-                for item in records[: max(2, self.max_results_per_topic)]
-                if str(item.get("url", "")).strip()
-            )
-        )
+        candidate_urls = self._pick_extract_urls(records, topic=topic)
         if not candidate_urls:
             return records
 
@@ -556,7 +633,7 @@ class MCPWebAdapter:
             if extracted_title and self._is_generic_title(current_title, topic):
                 cloned["title"] = extracted_title
                 updated = True
-            if extracted_text and len(current_snippet) < max(120, len(extracted_text) // 2):
+            if extracted_text and len(current_snippet) < max(180, len(extracted_text) // 2):
                 cloned["snippet"] = extracted_text[:280]
                 updated = True
             if extracted_domain and current_domain == "web":
@@ -710,7 +787,7 @@ class MCPWebAdapter:
         if not title:
             title = topic or self._domain_label(domain) or "Untitled"
 
-        if not any((title, url, snippet)):
+        if not url and not snippet:
             return None
 
         return {
@@ -724,10 +801,8 @@ class MCPWebAdapter:
 
     def _rank_evidence(self, item: Evidence) -> float:
         source_name = self._source_name(item.source)
-        source_boost = 0.0
-        if any(source_name.endswith(preferred) for preferred in self.PREFERRED_SOURCES):
-            source_boost = 0.4
-        content_boost = min(len(item.summary) / 500.0, 0.2)
+        source_boost = self._source_quality_boost(source_name)
+        content_boost = min(len(item.summary) / 420.0, 0.3)
         return item.relevance + source_boost + content_boost
 
     def _diversify(self, evidence: list[Evidence], limit: int) -> list[Evidence]:
@@ -760,6 +835,29 @@ class MCPWebAdapter:
         if len(parts) == 2:
             return parts[1].lower()
         return source.lower()
+
+    def _topic_focus(self, topic: str) -> str:
+        lowered = topic.lower()
+        if "equit" in lowered:
+            return "equities"
+        if "credit" in lowered:
+            return "credit markets"
+        if "bond" in lowered or "treasury" in lowered:
+            return "bond markets"
+
+        if lowered.endswith(" outlook"):
+            return self._clean_text(topic[: -len(" outlook")]) or topic
+
+        ticker_match = re.search(r"\b[A-Z]{2,6}\b", topic)
+        if ticker_match:
+            return ticker_match.group(0)
+
+        return self._clean_text(topic)
+
+    def _looks_like_asset_topic(self, topic: str, focus: str) -> bool:
+        if self._clean_text(topic).lower().endswith("outlook"):
+            return True
+        return bool(re.fullmatch(r"[A-Z]{2,6}", focus))
 
     def _infer_domain(self, item: dict[str, Any], url: str) -> str:
         url_domain = self._extract_domain(url)
@@ -938,6 +1036,27 @@ class MCPWebAdapter:
                 return preferred
         return normalized
 
+    def _is_low_quality_domain(self, domain: str) -> bool:
+        normalized = self._canonical_domain(domain)
+        return any(normalized == candidate or normalized.endswith(f".{candidate}") for candidate in self.LOW_QUALITY_DOMAINS)
+
+    def _source_quality_boost(self, domain: str) -> float:
+        normalized = self._canonical_domain(domain)
+        if not normalized:
+            return 0.0
+        if self._is_low_quality_domain(normalized):
+            return -0.45
+        if any(normalized == preferred or normalized.endswith(f".{preferred}") for preferred in self.PREFERRED_SOURCES):
+            return 0.65
+        return 0.0
+
+    def _prune_low_quality_records(self, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        ranked = sorted(records, key=self._record_rank, reverse=True)
+        stronger = [item for item in ranked if not self._is_low_quality_domain(str(item.get("domain") or ""))]
+        if len(stronger) >= self.max_results_per_topic:
+            return stronger
+        return ranked
+
     def _domain_label(self, domain: str) -> str:
         normalized = self._canonical_domain(domain)
         return normalized or "Untitled"
@@ -983,12 +1102,42 @@ class MCPWebAdapter:
 
     def _record_rank(self, item: dict[str, Any]) -> float:
         domain = self._canonical_domain(str(item.get("domain") or "web").lower())
-        source_boost = 0.4 if any(domain.endswith(preferred) for preferred in self.PREFERRED_SOURCES) else 0.0
+        source_boost = self._source_quality_boost(domain)
         snippet = self._clean_text(item.get("snippet") or "")
-        content_boost = min(len(snippet) / 500.0, 0.2)
+        content_boost = min(len(snippet) / 420.0, 0.3)
         relevance = self._coerce_score(item.get("relevance"))
         enriched_boost = 0.05 if item.get("extract_enriched") else 0.0
         return relevance + source_boost + content_boost + enriched_boost
+
+    def _pick_extract_urls(self, records: list[dict[str, Any]], topic: str) -> list[str]:
+        ranked = sorted(records, key=self._record_rank, reverse=True)
+        urls: list[str] = []
+        limit = min(3, max(1, self.max_results_per_topic))
+
+        for item in ranked:
+            url = self._clean_text(item.get("url") or "")
+            if not url or url in urls:
+                continue
+            snippet = self._clean_text(item.get("snippet") or "")
+            domain = self._clean_text(item.get("domain") or "").lower()
+            title = self._clean_text(item.get("title") or "")
+            if self._is_low_quality_domain(domain):
+                continue
+            if len(snippet) >= 220 and not self._is_generic_title(title, topic):
+                continue
+            urls.append(url)
+            if len(urls) >= limit:
+                return urls
+
+        for item in ranked:
+            url = self._clean_text(item.get("url") or "")
+            if not url or url in urls:
+                continue
+            urls.append(url)
+            if len(urls) >= limit:
+                break
+
+        return urls
 
     def _is_generic_title(self, title: str, topic: str) -> bool:
         normalized = self._clean_text(title).lower()
