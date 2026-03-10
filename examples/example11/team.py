@@ -3,9 +3,10 @@ from __future__ import annotations
 from dotenv import load_dotenv
 
 try:
-    from .adapters import MCPMacroAdapter, MCPWebAdapter
+    from .adapters import MCPMacroAdapter, MCPWebAdapter, MarketAdapter
     from .agents import (
         MacroRegimeAgent,
+        MarketDataAgent,
         PortfolioSynthesisAgent,
         ResearchBriefAgent,
         WebIntelligenceAgent,
@@ -13,9 +14,10 @@ try:
     from .config import load_config
     from .services import ReportFormatter, ResearchOrchestrator, SQLiteStorage
 except ImportError:  # pragma: no cover
-    from adapters import MCPMacroAdapter, MCPWebAdapter
+    from adapters import MCPMacroAdapter, MCPWebAdapter, MarketAdapter
     from agents import (
         MacroRegimeAgent,
+        MarketDataAgent,
         PortfolioSynthesisAgent,
         ResearchBriefAgent,
         WebIntelligenceAgent,
@@ -37,8 +39,10 @@ def build_example11_system() -> ResearchOrchestrator:
             max_topics=config.top_topics,
         ),
         web_intelligence_agent=WebIntelligenceAgent(),
+        market_data_agent=MarketDataAgent(),
         macro_regime_agent=MacroRegimeAgent(),
         portfolio_synthesis_agent=PortfolioSynthesisAgent(),
+        market_adapter=MarketAdapter(),
         mcp_web_adapter=MCPWebAdapter(
             server_url=config.mcp_web_server_url,
             timeout_sec=config.mcp_timeout_sec,

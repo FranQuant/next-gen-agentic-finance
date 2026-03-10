@@ -28,10 +28,12 @@ class PortfolioSynthesisAgent:
         query: str,
         brief: ResearchBrief,
         web_view: dict,
+        market_view: dict,
         macro_view: dict,
         history: list[RunRecord] | None = None,
     ) -> PortfolioView:
         score = float(web_view.get("sentiment_score", 0.0))
+        score += float(market_view.get("trend_score", 0.0))
         score += float(macro_view.get("macro_score", 0.0))
         score += 0.25 * self._intent_bias(query)
 
@@ -59,11 +61,15 @@ class PortfolioSynthesisAgent:
 
         thesis: list[str] = []
         thesis.extend(web_view.get("key_points", [])[:2])
+        thesis.append(market_view.get("summary", "Market signal is mixed."))
         thesis.append(macro_view.get("summary", "Macro signal is mixed."))
-        thesis.append("Market adapter disabled in Example11 v1; stance uses web+macro MCP views.")
 
         risks: list[str] = []
         risks.extend(web_view.get("risks", [])[:2])
+        high_volatility = market_view.get("high_volatility", [])
+        if high_volatility:
+            joined = ", ".join(high_volatility[:3])
+            risks.append(f"High realized volatility detected in: {joined}.")
         risks.extend(macro_view.get("risks", [])[:2])
         if not risks:
             risks.append("Model confidence is modest because signals are lightweight.")

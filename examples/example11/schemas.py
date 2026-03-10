@@ -26,6 +26,16 @@ class Evidence:
 
 
 @dataclass
+class MarketSnapshot:
+    tickers: list[str]
+    as_of: str
+    prices: dict[str, float]
+    returns_20d: dict[str, float]
+    vol_20d: dict[str, float]
+    notes: list[str] = field(default_factory=list)
+
+
+@dataclass
 class MacroState:
     as_of: str
     indicators: dict[str, float]
@@ -61,6 +71,8 @@ class ResearchPacket:
     brief: ResearchBrief
     evidence: list[Evidence]
     web_view: dict[str, Any]
+    market_snapshot: MarketSnapshot
+    market_view: dict[str, Any]
     macro_state: MacroState
     macro_view: dict[str, Any]
     history: list[RunRecord]

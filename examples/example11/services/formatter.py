@@ -18,7 +18,7 @@ class ReportFormatter:
                 "- Macro Lens: "
                 f"{', '.join(packet.brief.macro_indicators) if packet.brief.macro_indicators else 'N/A'}"
             ),
-            "- Capability Layer: MCP web + MCP macro",
+            "- Capability Layer: MCP web + MCP macro + local market snapshot",
         ]
 
         stance_line = self._stance_delta_line(packet)
@@ -31,6 +31,7 @@ class ReportFormatter:
 
         interpretation_lines = [
             f"- Web: {packet.web_view.get('summary', 'N/A')}",
+            f"- Market: {packet.market_view.get('summary', 'N/A')}",
             f"- Macro: {packet.macro_view.get('summary', 'N/A')}",
         ]
         indicator_snapshot = packet.macro_view.get("indicator_snapshot", {})

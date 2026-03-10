@@ -37,7 +37,7 @@ def _render_rich(packet: Any) -> None:
     brief_table.add_row("Universe", ", ".join(packet.brief.tickers) or "N/A")
     brief_table.add_row("Topics", ", ".join(packet.brief.topics[:4]) or "N/A")
     brief_table.add_row("Macro Lens", ", ".join(packet.brief.macro_indicators) or "N/A")
-    brief_table.add_row("Transport", "MCP-native (web + macro)")
+    brief_table.add_row("Transport", "MCP-native (web + macro) + local market snapshot")
     console.print(brief_table)
 
     evidence_table = Table(title="Evidence", box=box.SIMPLE_HEAD, show_header=True)
@@ -55,6 +55,7 @@ def _render_rich(packet: Any) -> None:
 
     interpretation_lines = [
         f"Web: {packet.web_view.get('summary', 'N/A')}",
+        f"Market: {packet.market_view.get('summary', 'N/A')}",
         f"Macro: {packet.macro_view.get('summary', 'N/A')}",
     ]
     macro_snapshot = packet.macro_view.get("indicator_snapshot", {})
