@@ -22,6 +22,13 @@ class PortfolioSynthesisAgent:
     TECH_TICKERS = {"QQQ", "XLK", "SMH", "SOXX", "IGV"}
     LONG_DURATION_BONDS = {"TLT", "IEF", "EDV", "TLH"}
     SHORT_DURATION_DEFENSIVES = {"SHY", "BIL", "TIP"}
+    FILTERED_RISK_TERMS = (
+        "stub",
+        "adapter",
+        "placeholder",
+        "client unavailable",
+        "request failed",
+    )
 
     def synthesize(
         self,
@@ -73,6 +80,7 @@ class PortfolioSynthesisAgent:
         risks.extend(macro_view.get("risks", [])[:2])
         if sentiment and sentiment.notes:
             risks.extend(sentiment.notes[:1])
+        risks = self._clean_risks(risks)
         if not risks:
             risks.append("Model confidence is modest because signals are lightweight.")
 
@@ -322,6 +330,19 @@ class PortfolioSynthesisAgent:
         if first_key is not None:
             allocations[first_key] = round(allocations[first_key] + adjustment, 4)
         return allocations
+
+    def _clean_risks(self, risks: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        for risk in risks:
+            text = str(risk).strip()
+            if not text:
+                continue
+            lowered = text.lower()
+            if any(term in lowered for term in self.FILTERED_RISK_TERMS):
+                continue
+            if text not in cleaned:
+                cleaned.append(text)
+        return cleaned
 
     def _clamp(self, value: float, low: float, high: float) -> float:
         return max(low, min(high, value))
