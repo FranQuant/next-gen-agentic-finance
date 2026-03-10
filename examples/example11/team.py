@@ -47,6 +47,8 @@ def build_example11_system() -> ResearchOrchestrator:
             server_command=config.mcp_web_server_command,
             server_args=list(config.mcp_web_server_args),
             tool_name=config.mcp_web_tool_name,
+            extract_tool_name=config.mcp_web_extract_tool_name,
+            enable_extract_enrichment=config.mcp_web_enable_extract_enrichment,
         ),
         mcp_macro_adapter=MCPMacroAdapter(
             server_url=config.mcp_server_url,
