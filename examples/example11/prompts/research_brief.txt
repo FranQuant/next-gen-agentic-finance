@@ -1,1 +1,0 @@
-Convert the raw research query into a compact ResearchBrief with explicit topics, tickers, and macro indicators.

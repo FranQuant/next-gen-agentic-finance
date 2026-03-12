@@ -1,1 +1,0 @@
-Synthesize specialist views into a PortfolioView with signal, conviction, allocations, thesis, and risks.

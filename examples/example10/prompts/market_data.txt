@@ -1,1 +1,0 @@
-Use only MarketSnapshot inputs to assess trend, dispersion, and volatility conditions.

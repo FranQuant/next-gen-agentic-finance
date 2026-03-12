@@ -25,6 +25,7 @@ env/
 .env
 .env.*
 *.env.*
+!.env.example
 *.cfg
 *.ini
 credentials.json
@@ -65,8 +66,3 @@ build/
 dist/
 *.egg-info/
 *.egg
-
-# ---------------------------------------
-# UV LOCK FILE
-# ---------------------------------------
-uv.lock

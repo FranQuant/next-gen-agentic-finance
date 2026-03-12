@@ -1,30 +1,18 @@
 [project]
 name = "nextgen-agentic-finance"
 version = "0.1.0"
-description = "Agentic Finance Bootcamp – local project"
+description = "Reference agentic finance examples spanning AGNO demos, research teams, and packaged multi-source orchestrators."
 readme = "README.md"
 requires-python = ">=3.13"
 
 dependencies = [
     "agno>=2.1.4",
-    "chonkie[st]>=1.4.0",
-    "ddgs>=9.6.1",
     "duckdb>=1.4.1",
-    "fastapi>=0.119.0",
-    "huggingface-hub>=0.35.3",
-    "lancedb>=0.25.2",
     "mcp[cli]>=1.19.0",
     "openai>=2.3.0",
     "pandas>=2.3.3",
-    "pypdf>=6.1.1",
-    "quantmod==0.1.0",
     "sqlalchemy>=2.0.44",
-    "uvicorn>=0.38.0",
-    "youtube-transcript-api>=1.2.3",
     "python-dotenv>=1.0",
-    "requests>=2.32",
-    "matplotlib>=3.9",
-    "tpqoa",
     "fredapi>=0.5.2",
     "tavily-python>=0.7.21",
     "yfinance>=0.2",
@@ -34,6 +22,3 @@ dependencies = [
 dev = [
     "pytest>=8.0"
 ]
-
-[tool.uv.sources]
-tpqoa = { git = "https://github.com/yhilpisch/tpqoa.git" }
