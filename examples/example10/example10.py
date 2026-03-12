@@ -20,6 +20,32 @@ except Exception:  # pragma: no cover
     _HAS_RICH = False
 
 
+def _status_lines(packet: Any) -> list[str]:
+    web_mode = str(packet.web_view.get("evidence_mode") or "unknown").lower()
+    actionable_count = int(packet.web_view.get("actionable_evidence_count", 0) or 0)
+    fallback_count = int(packet.web_view.get("fallback_evidence_count", 0) or 0)
+    degraded = bool(packet.web_view.get("degraded")) or web_mode != "live"
+
+    lines = [f"Trust Mode: {'degraded' if degraded else 'live'}"]
+
+    if web_mode == "fallback_only":
+        lines.append("Web Evidence: fallback-only placeholder evidence; excluded from directional scoring.")
+    elif web_mode == "mixed":
+        lines.append(
+            "Web Evidence: "
+            f"{actionable_count} live item(s) plus {fallback_count} fallback placeholder item(s); "
+            "scoring used live evidence only."
+        )
+    elif web_mode == "live":
+        lines.append(f"Web Evidence: {actionable_count} live item(s).")
+    elif web_mode == "none":
+        lines.append("Web Evidence: no external evidence was retrieved.")
+    else:
+        lines.append(f"Web Evidence: {web_mode}.")
+
+    return lines
+
+
 def _render_rich(packet: Any) -> None:
     console = Console()
 
@@ -39,6 +65,15 @@ def _render_rich(packet: Any) -> None:
     brief_table.add_row("Macro Lens", ", ".join(packet.brief.macro_indicators) or "N/A")
     brief_table.add_row("Horizon", packet.brief.timeframe)
     console.print(brief_table)
+
+    degraded = bool(packet.web_view.get("degraded")) or str(packet.web_view.get("evidence_mode") or "").lower() != "live"
+    console.print(
+        Panel(
+            "\n".join(f"- {line}" for line in _status_lines(packet)),
+            title="Run Status",
+            border_style="yellow" if degraded else "green",
+        )
+    )
 
     evidence_table = Table(title="Evidence", box=box.SIMPLE_HEAD, show_header=True)
     evidence_table.add_column("#", justify="right", width=3)

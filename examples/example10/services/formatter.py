@@ -24,6 +24,8 @@ class ReportFormatter:
         if stance_line:
             brief_summary_lines.append(stance_line)
 
+        status_lines = self._status_lines(packet)
+
         evidence_lines = [
             f"- {item.title} [{item.source}]"
             for item in packet.evidence[:5]
@@ -63,6 +65,9 @@ class ReportFormatter:
         sections = [
             *brief_summary_lines,
             "",
+            "RUN STATUS",
+            *status_lines,
+            "",
             "EVIDENCE",
             *evidence_lines,
             "",
@@ -87,3 +92,28 @@ class ReportFormatter:
         if prior_signal == current_signal:
             return f"- Stance vs Recent History: unchanged ({current_signal})."
         return f"- Stance vs Recent History: {prior_signal} -> {current_signal}."
+
+    def _status_lines(self, packet: ResearchPacket) -> list[str]:
+        web_mode = str(packet.web_view.get("evidence_mode") or "unknown").lower()
+        actionable_count = int(packet.web_view.get("actionable_evidence_count", 0) or 0)
+        fallback_count = int(packet.web_view.get("fallback_evidence_count", 0) or 0)
+        degraded = bool(packet.web_view.get("degraded")) or web_mode != "live"
+
+        lines = [f"- Trust Mode: {'degraded' if degraded else 'live'}"]
+
+        if web_mode == "fallback_only":
+            lines.append("- Web Evidence: fallback-only placeholder evidence; excluded from directional scoring.")
+        elif web_mode == "mixed":
+            lines.append(
+                "- Web Evidence: "
+                f"{actionable_count} live item(s) plus {fallback_count} fallback placeholder item(s); "
+                "scoring used live evidence only."
+            )
+        elif web_mode == "live":
+            lines.append(f"- Web Evidence: {actionable_count} live item(s).")
+        elif web_mode == "none":
+            lines.append("- Web Evidence: no external evidence was retrieved.")
+        else:
+            lines.append(f"- Web Evidence: {web_mode}.")
+
+        return lines

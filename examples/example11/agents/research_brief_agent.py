@@ -25,6 +25,20 @@ _STOPWORDS = {
     "ETF",
     "GDP",
     "CPI",
+    "BOND",
+    "BONDS",
+    "LONG",
+    "MACRO",
+    "MONTH",
+    "NEWS",
+    "RATE",
+    "RATES",
+    "RISK",
+    "RISKS",
+    "SHORT",
+    "STOCK",
+    "VIEW",
+    "YIELD",
 }
 
 
@@ -69,13 +83,14 @@ class ResearchBriefAgent:
         )
 
     def _extract_tickers(self, query: str) -> list[str]:
-        candidates = re.findall(r"\b[A-Z]{1,5}\b", query)
+        candidates = re.findall(r"\b[A-Za-z]{1,5}\b", query)
         tickers: list[str] = []
         for candidate in candidates:
-            if candidate in _STOPWORDS:
+            normalized = candidate.upper()
+            if normalized in _STOPWORDS:
                 continue
-            if candidate not in tickers:
-                tickers.append(candidate)
+            if normalized not in tickers:
+                tickers.append(normalized)
         return tickers
 
     def _extract_topics(self, query: str, tickers: list[str]) -> list[str]:

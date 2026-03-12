@@ -40,7 +40,14 @@ class PortfolioSynthesisAgent:
         sentiment: SentimentSnapshot | None = None,
         history: list[RunRecord] | None = None,
     ) -> PortfolioView:
-        score = float(web_view.get("sentiment_score", 0.0))
+        web_mode = str(web_view.get("evidence_mode") or "none").lower()
+        actionable_web_count = int(web_view.get("actionable_evidence_count", 0) or 0)
+
+        web_score = float(web_view.get("sentiment_score", 0.0))
+        if actionable_web_count <= 0 or web_mode in {"fallback_only", "none"}:
+            web_score = 0.0
+
+        score = web_score
         score += float(market_view.get("trend_score", 0.0))
         score += float(macro_view.get("macro_score", 0.0))
         score += 0.25 * self._intent_bias(query)
@@ -62,6 +69,8 @@ class PortfolioSynthesisAgent:
             signal = "SHORT"
 
         conviction = min(0.95, max(0.2, abs(score)))
+        if actionable_web_count <= 0:
+            conviction = min(conviction, 0.65)
         allocations = self._build_allocations(
             signal=signal,
             tickers=brief.tickers,
@@ -80,6 +89,12 @@ class PortfolioSynthesisAgent:
         risks.extend(macro_view.get("risks", [])[:2])
         if sentiment and sentiment.notes:
             risks.extend(sentiment.notes[:1])
+        if web_mode == "fallback_only":
+            risks.append("Web evidence is fallback-only placeholder context and was excluded from directional scoring.")
+        elif web_mode == "mixed":
+            risks.append("Fallback placeholder web evidence was present; only live evidence informed the directional score.")
+        elif web_mode == "none":
+            risks.append("No external web evidence was retrieved; signal relies on market and macro adapters.")
         risks = self._clean_risks(risks)
         if not risks:
             risks.append("Model confidence is modest because signals are lightweight.")

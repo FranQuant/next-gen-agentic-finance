@@ -369,11 +369,14 @@ class TavilyAdapter:
     def _fallback(self, topics: list[str], note: str) -> list[Evidence]:
         return [
             Evidence(
-                source="stub:web",
-                title=f"Placeholder intelligence for {topic}",
-                summary=f"{note} Topic tracked for directional context.",
+                source="fallback:tavily",
+                title=f"Fallback placeholder for {topic}",
+                summary=(
+                    f"Fallback evidence only. {note} "
+                    "Topic tracked for directional context; not live sourced research."
+                ),
                 timestamp=self._now_iso(),
-                relevance=0.3,
+                relevance=0.1,
             )
             for topic in topics
         ]
