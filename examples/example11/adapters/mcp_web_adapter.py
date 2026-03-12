@@ -1083,6 +1083,7 @@ class MCPWebAdapter:
             "topics": list(topics or []),
             "live_mcp_used": False,
             "fallback_used": False,
+            "mode": "uninitialized",
             "extract_enrichment_used": False,
             "search_calls": [],
             "extract_calls": [],
@@ -1168,22 +1169,18 @@ class MCPWebAdapter:
 
     def _fallback(self, topics: list[str], note: str) -> list[Evidence]:
         self.last_search_report["fallback_used"] = True
-        source_cycle = [
-            "mcp-fallback:reuters.com",
-            "mcp-fallback:bloomberg.com",
-            "mcp-fallback:federalreserve.gov",
-            "mcp-fallback:imf.org",
-            "mcp-fallback:wsj.com",
-        ]
+        self.last_search_report["mode"] = "offline-fallback"
 
         fallback: list[Evidence] = []
-        for idx, topic in enumerate(topics):
-            source_index = (sum(ord(ch) for ch in topic) + idx) % len(source_cycle)
+        for topic in topics:
             fallback.append(
                 Evidence(
-                    source=source_cycle[source_index],
-                    title=f"Placeholder intelligence for {topic}",
-                    summary=f"{note} Topic tracked for directional context.",
+                    source="offline-fallback:web",
+                    title=f"Offline placeholder only: {topic}",
+                    summary=(
+                        f"{note} No live MCP web evidence was retrieved. "
+                        "Placeholder text only; not sourced research."
+                    ),
                     timestamp=self._now_iso(),
                     relevance=0.35,
                 )

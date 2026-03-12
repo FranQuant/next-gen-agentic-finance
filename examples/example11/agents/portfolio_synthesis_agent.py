@@ -44,6 +44,7 @@ class PortfolioSynthesisAgent:
             if last_signal == "SHORT" and score < 0:
                 score -= 0.03
 
+        evidence_mode = str(web_view.get("evidence_mode", "live"))
         signal = "NEUTRAL"
         if score >= 0.15:
             signal = "LONG"
@@ -51,6 +52,10 @@ class PortfolioSynthesisAgent:
             signal = "SHORT"
 
         conviction = min(0.95, max(0.2, abs(score)))
+        if evidence_mode in {"fallback_only", "none"}:
+            signal = "NEUTRAL"
+            conviction = 0.2
+
         allocations = self._build_allocations(
             signal=signal,
             tickers=brief.tickers,
@@ -71,6 +76,8 @@ class PortfolioSynthesisAgent:
             joined = ", ".join(high_volatility[:3])
             risks.append(f"High realized volatility detected in: {joined}.")
         risks.extend(macro_view.get("risks", [])[:2])
+        if evidence_mode in {"fallback_only", "none"}:
+            risks.insert(0, "Fallback-only web evidence detected; portfolio signal held neutral.")
         if not risks:
             risks.append("Model confidence is modest because signals are lightweight.")
 

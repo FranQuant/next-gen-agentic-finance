@@ -20,6 +20,40 @@ except Exception:  # pragma: no cover
     _HAS_RICH = False
 
 
+def _status_lines(packet: Any) -> list[str]:
+    metadata = getattr(packet, "metadata", {}) or {}
+    web_view = getattr(packet, "web_view", {}) or {}
+    web_mode = str(metadata.get("web_mode") or web_view.get("evidence_mode") or "unknown")
+    macro_mode = str(metadata.get("macro_mode") or "unknown")
+    degraded = bool(metadata.get("degraded"))
+    neutralized = bool(metadata.get("neutralized_for_fallback"))
+
+    lines = [f"Trust Mode: {'degraded' if degraded else 'live'}"]
+
+    if web_mode == "fallback_only":
+        lines.append("Web Evidence: offline placeholder notes only; not sourced research.")
+    elif web_mode == "mixed":
+        lines.append("Web Evidence: live MCP results plus fallback placeholders; placeholders were ignored.")
+    elif web_mode == "live":
+        lines.append("Web Evidence: live MCP results.")
+    elif web_mode == "none":
+        lines.append("Web Evidence: no usable web evidence was retrieved.")
+    else:
+        lines.append(f"Web Evidence: {web_mode}.")
+
+    if macro_mode == "mcp-fallback":
+        lines.append("Macro Data: fallback baseline values were used.")
+    elif macro_mode == "mcp-live":
+        lines.append("Macro Data: live MCP macro state.")
+    elif macro_mode != "unknown":
+        lines.append(f"Macro Data: {macro_mode}.")
+
+    if neutralized:
+        lines.append("Actionability: signal held neutral until live sourced web evidence is available.")
+
+    return lines
+
+
 def _render_rich(packet: Any) -> None:
     console = Console()
 
@@ -39,6 +73,14 @@ def _render_rich(packet: Any) -> None:
     brief_table.add_row("Macro Lens", ", ".join(packet.brief.macro_indicators) or "N/A")
     brief_table.add_row("Transport", "MCP-native (web + macro) + local market snapshot")
     console.print(brief_table)
+
+    console.print(
+        Panel(
+            "\n".join(f"- {line}" for line in _status_lines(packet)),
+            title="Run Status",
+            border_style="yellow" if getattr(packet, "metadata", {}).get("degraded") else "green",
+        )
+    )
 
     evidence_table = Table(title="Evidence", box=box.SIMPLE_HEAD, show_header=True)
     evidence_table.add_column("#", justify="right", width=3)

@@ -25,6 +25,8 @@ class ReportFormatter:
         if stance_line:
             brief_summary_lines.append(stance_line)
 
+        status_lines = self._status_lines(packet)
+
         evidence_lines = [f"- {item.title} [{item.source}]" for item in packet.evidence[:5]]
         if not evidence_lines:
             evidence_lines = ["- No external evidence available."]
@@ -59,6 +61,9 @@ class ReportFormatter:
         sections = [
             *brief_summary_lines,
             "",
+            "RUN STATUS",
+            *status_lines,
+            "",
             "EVIDENCE",
             *evidence_lines,
             "",
@@ -83,3 +88,35 @@ class ReportFormatter:
         if prior_signal == current_signal:
             return f"- Stance vs Recent History: unchanged ({current_signal})."
         return f"- Stance vs Recent History: {prior_signal} -> {current_signal}."
+
+    def _status_lines(self, packet: ResearchPacket) -> list[str]:
+        metadata = packet.metadata or {}
+        web_mode = str(metadata.get("web_mode") or packet.web_view.get("evidence_mode") or "unknown")
+        macro_mode = str(metadata.get("macro_mode") or "unknown")
+        degraded = bool(metadata.get("degraded"))
+        neutralized = bool(metadata.get("neutralized_for_fallback"))
+
+        lines = [f"- Trust Mode: {'degraded' if degraded else 'live'}"]
+
+        if web_mode == "fallback_only":
+            lines.append("- Web Evidence: offline placeholder notes only; not sourced research.")
+        elif web_mode == "mixed":
+            lines.append("- Web Evidence: live MCP results plus fallback placeholders; placeholders were ignored.")
+        elif web_mode == "live":
+            lines.append("- Web Evidence: live MCP results.")
+        elif web_mode == "none":
+            lines.append("- Web Evidence: no usable web evidence was retrieved.")
+        else:
+            lines.append(f"- Web Evidence: {web_mode}.")
+
+        if macro_mode == "mcp-fallback":
+            lines.append("- Macro Data: fallback baseline values were used.")
+        elif macro_mode == "mcp-live":
+            lines.append("- Macro Data: live MCP macro state.")
+        elif macro_mode != "unknown":
+            lines.append(f"- Macro Data: {macro_mode}.")
+
+        if neutralized:
+            lines.append("- Actionability: signal held neutral until live sourced web evidence is available.")
+
+        return lines
