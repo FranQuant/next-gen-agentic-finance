@@ -20,6 +20,8 @@ def build_agent() -> Agent:
 
             Use the available search tool to find recent news relevant to the user's query.
             Base your answer on retrieved results rather than invented headlines.
+            Prefer established financial, economic, or official sources when available, and use lower-quality or secondary sources only when necessary.
+            When multiple sources are available, prefer credible primary reporting and established financial/news publishers.
 
             Return:
             1. A markdown table with columns:

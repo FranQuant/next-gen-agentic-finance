@@ -14,8 +14,9 @@ def build_agent() -> Agent:
         instructions=dedent("""\
             You are a finance news sentiment assistant.
 
-            Score the provided headlines from +10 (very positive for gold)
-            to -10 (very negative for gold).
+            Score the provided headlines from +10 (very positive for gold price)
+            to -10 (very negative for gold price).
+            Treat these scores as heuristic sentiment judgments, not calibrated forecasts.
 
             Work only with the headlines given in the prompt.
             Do not claim you retrieved live news unless a tool is provided.
