@@ -10,7 +10,7 @@ load_dotenv()
 
 def build_agent() -> Agent:
     return Agent(
-        model=OpenAIResponses(id="gpt-5.2"),
+        model=OpenAIResponses(id="gpt-5.4"),
         instructions=dedent("""\
             You are a finance news sentiment assistant.
 
