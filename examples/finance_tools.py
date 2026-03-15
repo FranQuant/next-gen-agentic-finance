@@ -1,18 +1,104 @@
-# examples/finance_tools.py
+from datetime import datetime, timezone
+import os
+from urllib.parse import urlparse
 
 from agno.tools import tool
-import yfinance as yf
 from tavily import TavilyClient
-import os
+import yfinance as yf
 
 
 def _normalize_symbol(symbol: str) -> str:
     return symbol.strip().upper()
 
 
+def _is_missing(value) -> bool:
+    return value is None or value != value
+
+
+def _clean_text(value) -> str | None:
+    if value is None:
+        return None
+
+    text = value.strip() if isinstance(value, str) else str(value).strip()
+    return text or None
+
+
+def _to_builtin(value):
+    if _is_missing(value):
+        return None
+
+    if hasattr(value, "item"):
+        try:
+            value = value.item()
+        except Exception:
+            pass
+
+    if hasattr(value, "isoformat"):
+        try:
+            return value.isoformat()
+        except Exception:
+            pass
+
+    return value
+
+
+def _to_float_or_none(value) -> float | None:
+    value = _to_builtin(value)
+    if _is_missing(value):
+        return None
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_int_or_none(value) -> int | None:
+    value = _to_builtin(value)
+    if _is_missing(value):
+        return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_date(value) -> str | None:
+    value = _to_builtin(value)
+    if _is_missing(value):
+        return None
+
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(value, tz=timezone.utc).isoformat()
+        except (OverflowError, OSError, ValueError):
+            return str(value)
+
+    return _clean_text(value)
+
+
+def _publisher_from_url(url: str | None) -> str | None:
+    if not url:
+        return None
+
+    hostname = urlparse(url).netloc.lower()
+    if hostname.startswith("www."):
+        hostname = hostname[4:]
+
+    return hostname or None
+
+
+def _normalize_publisher(publisher, url: str | None = None) -> str | None:
+    if isinstance(publisher, dict):
+        publisher = publisher.get("displayName") or publisher.get("name")
+
+    return _clean_text(publisher) or _publisher_from_url(url)
+
+
 @tool
 def get_current_stock_price(symbol: str) -> dict:
-    """Return the latest available stock price snapshot."""
+    """Return the latest available Yahoo history-based market snapshot, not a guaranteed real-time price."""
     symbol = _normalize_symbol(symbol)
 
     try:
@@ -28,12 +114,15 @@ def get_current_stock_price(symbol: str) -> dict:
         return {
             "symbol": symbol,
             "ok": True,
-            "price": float(latest["Close"]),
-            "open": float(latest["Open"]) if "Open" in latest else None,
-            "day_high": float(latest["High"]) if "High" in latest else None,
-            "day_low": float(latest["Low"]) if "Low" in latest else None,
-            "volume": int(latest["Volume"]) if "Volume" in latest else None,
-            "previous_close": float(previous_close) if previous_close is not None else None,
+            "price": _to_float_or_none(latest.get("Close")),
+            "open": _to_float_or_none(latest.get("Open")),
+            "day_high": _to_float_or_none(latest.get("High")),
+            "day_low": _to_float_or_none(latest.get("Low")),
+            "volume": _to_int_or_none(latest.get("Volume")),
+            "previous_close": _to_float_or_none(previous_close),
+            "as_of": _normalize_date(hist.index[-1] if len(hist.index) else None),
+            "history_period": "5d",
+            "source": "yfinance history snapshot",
         }
     except Exception as e:
         return {"symbol": symbol, "ok": False, "error": str(e)}
@@ -41,7 +130,7 @@ def get_current_stock_price(symbol: str) -> dict:
 
 @tool
 def get_analyst_recommendations(symbol: str) -> dict:
-    """Return recent analyst recommendation records."""
+    """Return recent Yahoo analyst recommendation records, not a definitive consensus engine."""
     symbol = _normalize_symbol(symbol)
 
     try:
@@ -49,14 +138,25 @@ def get_analyst_recommendations(symbol: str) -> dict:
         recs = ticker.recommendations
 
         if recs is None or recs.empty:
-            return {"symbol": symbol, "ok": True, "analyst_recommendations": []}
+            return {
+                "symbol": symbol,
+                "ok": True,
+                "analyst_recommendations": [],
+                "record_count": 0,
+                "source": "yfinance recommendation records",
+            }
 
         latest = recs.tail(10).reset_index().to_dict(orient="records")
+        normalized = []
+        for row in latest:
+            normalized.append({key: _to_builtin(value) for key, value in row.items()})
+
         return {
             "symbol": symbol,
             "ok": True,
-            "record_count": len(latest),
-            "analyst_recommendations": latest,
+            "analyst_recommendations": normalized,
+            "record_count": len(normalized),
+            "source": "yfinance recommendation records",
         }
     except Exception as e:
         return {"symbol": symbol, "ok": False, "error": str(e)}
@@ -64,7 +164,7 @@ def get_analyst_recommendations(symbol: str) -> dict:
 
 @tool
 def get_company_info(symbol: str) -> dict:
-    """Return a curated subset of company fundamentals and descriptive fields."""
+    """Return a curated Yahoo company snapshot, not a clean audited fundamentals API."""
     symbol = _normalize_symbol(symbol)
 
     try:
@@ -108,14 +208,21 @@ def get_company_info(symbol: str) -> dict:
             "payoutRatio": info.get("payoutRatio"),
         }
 
-        return {"symbol": symbol, "ok": True, "company_info": curated}
+        normalized = {key: _to_builtin(value) for key, value in curated.items()}
+
+        return {
+            "symbol": symbol,
+            "ok": True,
+            "company_info": normalized,
+            "source": "yfinance info",
+        }
     except Exception as e:
         return {"symbol": symbol, "ok": False, "error": str(e)}
 
 
 @tool
 def get_company_news(symbol: str, num_stories: int = 10) -> dict:
-    """Return normalized recent news headlines from yfinance."""
+    """Return normalized recent Yahoo news items for a symbol."""
     symbol = _normalize_symbol(symbol)
 
     try:
@@ -123,40 +230,64 @@ def get_company_news(symbol: str, num_stories: int = 10) -> dict:
         news = ticker.news or []
 
         normalized = []
-        for item in news[:num_stories]:
+        for item in news:
+            if not isinstance(item, dict):
+                continue
+
             content = item.get("content") if isinstance(item, dict) else None
 
             if isinstance(content, dict):
-                normalized.append({
-                    "title": content.get("title"),
-                    "publisher": content.get("provider", {}).get("displayName")
-                    if isinstance(content.get("provider"), dict)
-                    else content.get("publisher"),
-                    "date": content.get("pubDate") or content.get("displayTime"),
-                    "url": content.get("canonicalUrl", {}).get("url")
+                title = _clean_text(content.get("title"))
+                url = _clean_text(
+                    content.get("canonicalUrl", {}).get("url")
                     if isinstance(content.get("canonicalUrl"), dict)
                     else content.get("clickThroughUrl", {}).get("url")
                     if isinstance(content.get("clickThroughUrl"), dict)
-                    else content.get("url"),
-                    "summary": content.get("summary"),
-                })
+                    else content.get("url")
+                )
+                publisher = _normalize_publisher(
+                    content.get("provider") if isinstance(content.get("provider"), dict) else content.get("publisher"),
+                    url=url,
+                )
+                date = _normalize_date(content.get("pubDate") or content.get("displayTime"))
+                snippet = _clean_text(content.get("summary"))
             else:
-                normalized.append({
-                    "title": item.get("title"),
-                    "publisher": item.get("publisher"),
-                    "date": item.get("providerPublishTime") or item.get("pubDate"),
-                    "url": item.get("link") or item.get("url"),
-                    "summary": item.get("summary"),
-                })
+                title = _clean_text(item.get("title"))
+                url = _clean_text(item.get("link") or item.get("url"))
+                publisher = _normalize_publisher(item.get("publisher"), url=url)
+                date = _normalize_date(item.get("providerPublishTime") or item.get("pubDate"))
+                snippet = _clean_text(item.get("summary"))
 
-        return {"symbol": symbol, "ok": True, "news": normalized}
+            if not title or not url:
+                continue
+
+            normalized.append(
+                {
+                    "title": title,
+                    "publisher": publisher,
+                    "date": date,
+                    "url": url,
+                    "snippet": snippet,
+                }
+            )
+
+            if len(normalized) >= num_stories:
+                break
+
+        return {
+            "symbol": symbol,
+            "ok": True,
+            "news": normalized,
+            "returned_count": len(normalized),
+            "source": "yfinance news",
+        }
     except Exception as e:
         return {"symbol": symbol, "ok": False, "error": str(e)}
 
 
 @tool
 def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: int = 5) -> dict:
-    """Return normalized recent company news using Tavily."""
+    """Return normalized recent company news search results from Tavily."""
     symbol = _normalize_symbol(symbol)
 
     api_key = os.getenv("TAVILY_API_KEY")
@@ -183,26 +314,36 @@ def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: in
         results = response.get("results", []) if isinstance(response, dict) else []
 
         normalized = []
-        for item in results[:num_stories]:
-            url = item.get("url")
-            publisher = None
-            if isinstance(url, str) and "://" in url:
-                publisher = url.split("/")[2]
+        for item in results:
+            if not isinstance(item, dict):
+                continue
 
-            normalized.append({
-                "title": item.get("title"),
-                "publisher": publisher,
-                "date": item.get("published_date") or item.get("publishedDate"),
-                "url": url,
-                "summary": item.get("content"),
-                "score": item.get("score"),
-            })
+            title = _clean_text(item.get("title"))
+            url = _clean_text(item.get("url"))
+            if not title or not url:
+                continue
+
+            normalized.append(
+                {
+                    "title": title,
+                    "publisher": _normalize_publisher(item.get("source"), url=url),
+                    "date": _normalize_date(item.get("published_date") or item.get("publishedDate")),
+                    "url": url,
+                    "snippet": _clean_text(item.get("content")),
+                    "score": _to_float_or_none(item.get("score")),
+                }
+            )
+
+            if len(normalized) >= num_stories:
+                break
 
         return {
             "symbol": symbol,
             "ok": True,
-            "query_used": query,
             "news": normalized,
+            "query_used": query,
+            "returned_count": len(normalized),
+            "source": "Tavily news search",
         }
     except Exception as e:
         return {
