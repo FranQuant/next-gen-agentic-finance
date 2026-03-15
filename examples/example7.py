@@ -21,7 +21,7 @@ def build_team() -> Team:
     # ============================================================
     stock_searcher = Agent(
         name="stock-searcher",
-        model=OpenAIResponses(id="gpt-5.2"),
+        model=OpenAIResponses(id="gpt-5.4"),
         role="Retrieves market data and analyst consensus available from finance tools.",
         tools=[get_current_stock_price, get_analyst_recommendations],
         instructions="""
@@ -42,7 +42,7 @@ def build_team() -> Team:
     # ============================================================
     company_info_agent = Agent(
         name="company-info-searcher",
-        model=OpenAIResponses(id="gpt-5.2"),
+        model=OpenAIResponses(id="gpt-5.4"),
         role="Retrieves company fundamentals and recent news.",
         tools=[get_company_info, get_company_news_tavily],
         instructions="""
@@ -64,7 +64,7 @@ def build_team() -> Team:
     # ============================================================
     team = Team(
         name="Stock Research Team",
-        model=OpenAIResponses(id="gpt-5.2"),
+        model=OpenAIResponses(id="gpt-5.4"),
         members=[stock_searcher, company_info_agent],
         markdown=True,
         show_members_responses=True,
