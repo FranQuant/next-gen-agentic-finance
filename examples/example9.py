@@ -21,11 +21,11 @@ load_dotenv()
 
 def build_team() -> Team:
     db = SqliteDb(db_file="tmp/research_team.db")
-    model = OpenAIResponses(id="gpt-5.2")
+    model = OpenAIResponses(id="gpt-5.4")
 
     market_data_agent = Agent(
         name="market-data-agent",
-        role="Financial market data retrieval specialist",
+        role="Compact factual snapshot specialist",
         model=model,
         tools=[
             get_current_stock_price,
@@ -36,65 +36,54 @@ def build_team() -> Team:
         instructions=dedent("""
             You are a market data specialist.
 
-            Use the available tools and return ONLY a compact market snapshot.
+            Use the available tools and return ONLY a compact factual snapshot.
 
             Required output format:
 
-            PRICE
-            - Last Price: ...
-            - Market Cap: ...
-            - Forward P/E: ...
-            - Revenue Growth: ...
-            - Earnings Growth: ...
-
-            SENTIMENT
-            - Analyst Rating: ...
-            - Consensus Target Price: ...
-
-            NEWS
-            - ...
-            - ...
-            - ...
+            - Price / Market Cap: ...
+            - 52-Week Range / Recent Performance: ...
+            - Forward / Trailing Valuation: ...
+            - Growth / Margins: ...
+            - Cash / Debt / Buybacks / Dividend: ...
+            - Analyst Sentiment: ...
+            - Company-Specific News / Guidance / Segment Mix: ...
 
             Rules:
             - Never fabricate numbers
-            - If unavailable, write "Unavailable"
+            - If unavailable, weak, or unclear, label it clearly instead of improvising
             - Keep the whole output under 12 lines
-            - No extra commentary
-            - Use company info and Tavily news if available
+            - Prioritize price, market cap, 52-week range, recent performance, valuation, growth, margins, cash, debt, buybacks, dividend, and analyst sentiment
+            - Include only a very short note on recent company-specific news if clearly supported
+            - Do not produce thesis language, recommendation language, or broad risk interpretation
         """),
         markdown=True,
     )
 
-    quant_strategist = Agent(
-        name="quant-strategist",
-        role="Institutional strategy interpreter",
+    strategy_interpreter = Agent(
+        name="strategy-interpreter",
+        role="Compact institutional strategy interpreter",
         model=model,
         instructions=dedent("""
-            You are a quantitative strategist.
+            You are a strategy interpreter.
 
             You will receive a market snapshot from the market-data-agent.
             Use ONLY that snapshot.
 
             Return ONLY:
 
-            THESIS
-            - ...
-            - ...
-            - ...
-
-            RISKS
-            - ...
-            - ...
-            - ...
-
-            HORIZON
-            - ... months
+            - Thesis: ...
+            - Positioning: ...
+            - Catalysts: ...
+            - Risks: ...
+            - Key Metrics: ...
 
             Rules:
+            - Keep the interpretation compact and institutional in tone
             - Do not introduce external data
             - Do not fabricate numbers
-            - Keep the whole output under 10 lines
+            - No fake precision
+            - No unnecessary expansion
+            - Keep the whole output under 8 lines
             - No extra commentary
         """),
         markdown=True,
@@ -107,30 +96,23 @@ def build_team() -> Team:
         instructions=dedent("""
             You are a portfolio manager.
 
-            You will receive the strategist output.
+            You will receive the strategy-interpreter output.
             Convert it into a compact portfolio action.
 
             Return ONLY:
 
-            SIGNAL
-            - LONG / SHORT / NEUTRAL
-
-            CONVICTION
-            - Low / Medium / High
-
-            WEIGHT
-            - Small / Medium / Large
-
-            HORIZON
-            - ... months
-
-            RATIONALE
-            - ...
-            - ...
+            - Signal: LONG / SHORT / NEUTRAL
+            - Conviction: Low / Medium / High
+            - Weight: Small / Medium / Large
+            - Horizon: ...
+            - Action: ...
+            - Risk Management: ...
+            - What Changes the View: ...
 
             Rules:
-            - Base the action only on the strategist output
-            - Do not fabricate precise percentages, stops, option costs, or target levels
+            - Base the action only on the strategy-interpreter output
+            - Keep the output qualitative and bounded
+            - Do not fabricate precise percentages, stops, option costs, target levels, or pseudo-risk-engine language
             - Keep the whole output under 8 lines
             - No extra commentary
         """),
@@ -138,21 +120,21 @@ def build_team() -> Team:
     )
 
     research_team = Team(
-        name="AI Hedge Fund Research Team",
+        name="Research-to-Portfolio Workflow Team",
         model=model,
         members=[
             market_data_agent,
-            quant_strategist,
+            strategy_interpreter,
             portfolio_manager,
         ],
         instructions=dedent("""
-            You orchestrate a STRICT and COMPACT workflow.
+            You orchestrate a compact staged research-to-portfolio workflow.
 
             Workflow:
-            1. Ask market-data-agent for a compact market snapshot.
-            2. Pass the FULL snapshot explicitly to quant-strategist.
-            3. Pass the FULL strategist output explicitly to portfolio-manager.
-            4. Produce the final memo.
+            1. Ask market-data-agent for a compact factual snapshot.
+            2. Pass the FULL snapshot explicitly to strategy-interpreter.
+            3. Pass the FULL strategy-interpreter output explicitly to portfolio-manager.
+            4. Produce the final output.
 
             Final output must be EXACTLY:
 
@@ -160,7 +142,7 @@ def build_team() -> Team:
             <market snapshot>
 
             INTERPRETATION
-            <strategist output>
+            <strategy-interpreter output>
 
             PORTFOLIO ACTION
             <portfolio manager output>
