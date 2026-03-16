@@ -104,3 +104,7 @@ agentic_finance/
 - Run `example0_setup_check.py` to confirm the environment is working.
 - Start with `example1.py` to `example4.py` for foundations.
 - Use `example10` for the MCP-native finance research capstone.
+
+## Disclaimer
+
+This repository is for research and educational use only. Nothing in this codebase or its outputs constitutes investment advice.
