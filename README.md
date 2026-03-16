@@ -1,44 +1,27 @@
 # Agentic Finance Examples
 
-A compact repository of agentic finance research examples, progressing from simple AGNO demos to packaged research orchestrators with adapters, persistence, and reporting.
+A curated set of agentic finance examples covering tool-enabled research workflows, market and macro retrieval, multi-agent analysis, and an MCP-native finance research capstone.
 
-The repository currently combines:
+The repository brings together:
 
 - AGNO agents and teams
 - OpenAI Responses models
-- Tavily search
+- Tavily search and web intelligence
 - yfinance market and company data
-- DuckDB-backed CSV querying
-- SQLite-backed run history
-- MCP-based web and macro adapters in `example10`
-
-The examples are intentionally small, but the later ones are better understood as architecture demos than as single-file toy scripts.
-
-```mermaid
-flowchart TD
-    A[Example 0<br/>Setup Check] --> B[Examples 1-4<br/>Single-Agent AGNO Demos]
-    B --> C[Examples 5-6<br/>Finance Tooling Demos]
-    C --> D[Examples 7-9<br/>AGNO Team Workflows]
-    D --> E[Example 10<br/>Packaged Research Orchestrator]
-    E --> F[Example 11<br/>MCP-Native Research Orchestrator]
-
-    B --> B1[Prompting / tool use / CLI]
-    C --> C1[DuckDB CSV querying / custom finance tools]
-    D --> D1[Shared finance tools / SQLite-backed runs]
-    E --> E1[Tavily + market + macro adapters]
-    F --> F1[MCP web + MCP macro + local market snapshot]
-```
+- MCP-based web and macro integrations in `example10`
 
 ## Repository Purpose
 
-This repo is not a production trading system. It is a reference library for:
+This repository is a reference library of agentic finance examples focused on:
 
 - agent orchestration patterns
 - tool-calling in finance-oriented workflows
-- market and company data retrieval
+- market, macro, and web-intelligence retrieval
 - compact research pipelines
 - adapter and orchestrator design
-- reporting and run persistence
+- structured reporting and run persistence
+
+It is intended for experimentation, learning, and architectural reference rather than for live trading or production deployment.
 
 ## 1. Setup
 
