@@ -59,28 +59,21 @@ Some examples may run with only a subset of these variables, depending on the to
 
 ## 3. Example Guide
 
-| Example | Focus | Entry Point |
-| --- | --- | --- |
-| `0` | Environment and AGNO setup check | `python examples/example0_setup_check.py` |
-| `1` | Fixed-headline sentiment demo | `uv run examples/example1.py` |
-| `2` | Tavily-backed sentiment demo | `uv run examples/example2.py` |
-| `3` | Tool-visible sentiment demo | `uv run examples/example3.py` |
-| `4` | Interactive CLI sentiment agent | `uv run examples/example4.py` |
-| `5` | LatAm CSV assistant | `uv run examples/example5.py` |
-| `6` | Options maximum-pain tool demo | `uv run examples/example6.py` |
-| `7` | Two-member research team using shared finance tools | `uv run examples/example7.py` |
-| `8` | Persistent multi-agent investment memo workflow | `uv run examples/example8.py` |
-| `9` | Compact research-to-portfolio workflow | `uv run examples/example9.py` |
-| `10` | MCP-native finance research capstone | `uv run examples/example10/example10.py "Assess whether current macro and web evidence support a tactical overweight to equities"` |
+| Example | Focus |
+|---|---|
+| `example0` | Setup check |
+| `example1` to `example4` | Single-agent and tool-usage foundations |
+| `example5` and `example6` | Finance-shaped tool demos |
+| `example7` to `example9` | Multi-agent finance workflows |
+| `example10` | MCP-native finance research capstone |
 
-### Common entry points
+Progression:
 
-```bash
-python examples/example0_setup_check.py
-uv run examples/example7.py
-uv run examples/example10/example10.py "Assess whether current macro and web evidence support a tactical overweight to equities"
-EXAMPLE10_PLAIN_REPORT=1 uv run examples/example10/example10.py "Analyze MSFT for a 3-12 month portfolio view."
-```
+- `example0` → setup check
+- `example1` to `example4` → foundations
+- `example5` and `example6` → finance-oriented demos
+- `example7` to `example9` → multi-agent workflows
+- `example10` → flagship capstone
 
 ## 4. Shared Utility Layer
 
