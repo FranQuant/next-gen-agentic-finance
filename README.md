@@ -1,6 +1,6 @@
 # Agentic Finance Examples
 
-A curated set of agentic finance examples for tool-enabled research workflows, market and macro retrieval, multi-agent analysis, and an MCP-native finance research capstone.
+Agentic finance examples for tool-enabled research workflows, market and macro retrieval, multi-agent analysis, and MCP-native research orchestration.
 
 Built with:
 
