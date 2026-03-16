@@ -105,6 +105,10 @@ next-gen-agentic-finance/
 - Start with `example1.py` to `example4.py` for foundations.
 - Use `example10` for the MCP-native finance research capstone.
 
+## Quick Preview
+
+![Example10 demo](docs/example10_demo.gif)
+
 ## Disclaimer
 
 This repository is for research and educational use only. Nothing in this codebase or its outputs constitutes investment advice.
