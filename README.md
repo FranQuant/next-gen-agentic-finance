@@ -63,7 +63,7 @@ FRED_API_KEY=your_key_here
 
 `example10` can run without `OPENAI_API_KEY` and reports degraded or fallback behavior explicitly when live external evidence is unavailable.
 
-## 3. Example Progression
+## 3. Example Guide
 
 | Example | Focus | Entry Point |
 | --- | --- | --- |
@@ -72,18 +72,19 @@ FRED_API_KEY=your_key_here
 | `2` | Tavily-backed sentiment demo | `uv run examples/example2.py` |
 | `3` | Tool-visible sentiment demo | `uv run examples/example3.py` |
 | `4` | Interactive CLI sentiment agent | `uv run examples/example4.py` |
-| `5` | LatAm CSV SQL assistant | `uv run examples/example5.py` |
+| `5` | LatAm CSV assistant | `uv run examples/example5.py` |
 | `6` | Options maximum-pain tool demo | `uv run examples/example6.py` |
 | `7` | Two-member research team using shared finance tools | `uv run examples/example7.py` |
 | `8` | Persistent multi-agent investment memo workflow | `uv run examples/example8.py` |
 | `9` | Compact research-to-portfolio workflow | `uv run examples/example9.py` |
-| `10` | Packaged research orchestrator with MCP-style web and macro adapters | `uv run examples/example10/example10.py "Analyze MSFT and NVDA for a 3-12 month portfolio view."` |
+| `10` | MCP-native finance research capstone | `uv run examples/example10/example10.py "Assess whether current macro and web evidence support a tactical overweight to equities"` |
 
-Common entry points:
+### Common entry points
 
 ```bash
 python examples/example0_setup_check.py
 uv run examples/example7.py
+uv run examples/example10/example10.py "Assess whether current macro and web evidence support a tactical overweight to equities"
 EXAMPLE10_PLAIN_REPORT=1 uv run examples/example10/example10.py "Analyze MSFT for a 3-12 month portfolio view."
 ```
 
