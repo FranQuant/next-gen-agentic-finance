@@ -99,36 +99,8 @@ agentic_finance/
 └── uv.lock
 ```
 
-## 6. Notes on the Current Architecture
+## Where to Start
 
-The repository changes shape as it progresses:
-
-- **Examples 1-6** are mostly single-file AGNO and tool-calling demos.
-- **Examples 7-9** introduce shared finance tools and multi-agent workflows.
-- **Example 10** packages the workflow into adapters, schemas, storage, and reporting.
-
-The later examples are best read as compact architecture demos rather than as production systems. In `example10`, the packaged "agents" are deterministic analyzers inside an orchestrator stack, and the example is designed to degrade explicitly when live external data is unavailable.
-
-## 7. Validation
-
-This repository does not currently ship a dedicated automated test suite. Useful local checks:
-
-```bash
-python -m compileall examples
-python examples/example0_setup_check.py
-uv run examples/example7.py
-EXAMPLE10_PLAIN_REPORT=1 uv run examples/example10/example10.py "Analyze MSFT for a 3-12 month portfolio view."
-```
-
-## 8. Where to Start
-
-If you are new to the repository:
-
-- start with `example0_setup_check.py`
-- read `example1.py` through `example4.py` for the smallest AGNO demos
-- jump to `example7.py` through `example9.py` for multi-agent finance workflows
-- read `example10/` for the packaged orchestrator path
-
-## 9. Disclaimer
-
-This repository is for research and educational use only. Nothing in this codebase or its outputs constitutes investment advice.
+- Run `example0_setup_check.py` to confirm the environment is working.
+- Start with `example1.py` to `example4.py` for foundations.
+- Use `example10` for the MCP-native finance research capstone.
