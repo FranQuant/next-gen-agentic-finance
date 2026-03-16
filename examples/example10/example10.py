@@ -58,7 +58,7 @@ def _render_rich(packet: Any) -> None:
     console = Console()
 
     title = Panel.fit(
-        "[bold cyan]Example11[/bold cyan]\nMCP-Native Multi-Source Research Orchestrator",
+        "[bold cyan]Example10[/bold cyan]\nMCP-Native Finance Research Capstone",
         border_style="cyan",
     )
     console.print(title)

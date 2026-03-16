@@ -332,8 +332,8 @@ agentic_finance/
 │   │   ├── adapters/
 │   │   ├── agents/
 │   │   └── services/
-│   └── example11/
-│       ├── example11.py
+│   └── example10/
+│       ├── example10.py
 │       ├── team.py
 │       ├── config.py
 │       ├── schemas.py
