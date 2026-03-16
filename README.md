@@ -12,36 +12,31 @@ Built with:
 
 ## 1. Setup
 
-### Prerequisites
+This repository expects **Python 3.13** and uses `uv` for environment and dependency management.
 
-Install `uv` first if it is not already available on your system:
+Install `uv` if needed:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
-source $HOME/.local/bin/env
+source "$HOME/.local/bin/env"
 uv --version
 ```
 
-### Clone and install
+Clone the repository and create the environment:
 
 ```bash
 git clone https://github.com/FranQuant/next-gen-agentic-finance.git
 cd next-gen-agentic-finance
-uv venv .venv
+
+uv venv --python 3.13 .venv
 source .venv/bin/activate
 uv sync
 ```
 
-### Minimal setup check
+Run the setup check:
 
 ```bash
 python examples/example0_setup_check.py
-```
-
-Expected output:
-
-```text
-minimal Agno setup check passed
 ```
 
 ## 2. Environment Variables
