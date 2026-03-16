@@ -1,27 +1,14 @@
 # Agentic Finance Examples
 
-A curated set of agentic finance examples covering tool-enabled research workflows, market and macro retrieval, multi-agent analysis, and an MCP-native finance research capstone.
+A curated set of agentic finance examples for tool-enabled research workflows, market and macro retrieval, multi-agent analysis, and an MCP-native finance research capstone.
 
-The repository brings together:
+Built with:
 
-- AGNO agents and teams
+- Agno agents and teams
 - OpenAI Responses models
-- Tavily search and web intelligence
-- yfinance market and company data
+- Tavily web search
+- yfinance market data
 - MCP-based web and macro integrations in `example10`
-
-## Repository Purpose
-
-This repository is a reference library of agentic finance examples focused on:
-
-- agent orchestration patterns
-- tool-calling in finance-oriented workflows
-- market, macro, and web-intelligence retrieval
-- compact research pipelines
-- adapter and orchestrator design
-- structured reporting and run persistence
-
-It is intended for experimentation, learning, and architectural reference rather than for live trading or production deployment.
 
 ## 1. Setup
 
