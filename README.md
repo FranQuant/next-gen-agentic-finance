@@ -82,7 +82,6 @@ It is intended as a compact demo utility module, not a production SDK.
 ```text
 agentic_finance/
 ├── data/
-│   └── latamstocks.csv
 ├── examples/
 │   ├── example0_setup_check.py
 │   ├── example1.py ... example9.py
@@ -97,11 +96,8 @@ agentic_finance/
 │   │   └── services/
 ├── README.md
 ├── pyproject.toml
-├── tmp/
 └── uv.lock
 ```
-
-Runtime artifacts are written under `tmp/` and are not part of the core source tree.
 
 ## 6. Notes on the Current Architecture
 
