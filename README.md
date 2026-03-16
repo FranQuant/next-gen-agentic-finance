@@ -10,7 +10,7 @@ The repository currently combines:
 - yfinance market and company data
 - DuckDB-backed CSV querying
 - SQLite-backed run history
-- MCP-based web and macro adapters in `example11`
+- MCP-based web and macro adapters in `example10`
 
 The examples are intentionally small, but the later ones are better understood as architecture demos than as single-file toy scripts.
 
@@ -74,12 +74,12 @@ FRED_API_KEY=your_key_here
 
 Notes:
 
-- `OPENAI_API_KEY` is required for the AGNO/OpenAI demos in examples `1` through `9`. It is not used by `example10` or `example11`.
+- `OPENAI_API_KEY` is required for the AGNO/OpenAI demos in examples `1` through `9`. It is not used by `example10` or `example10`.
 - `TAVILY_API_KEY` is used by Tavily-backed search and news flows in examples `2`, `3`, `4`, `7`, `9`, and `10`.
-- In `example11`, `TAVILY_API_KEY` is optional. If present, it can be used to infer a live Tavily MCP web endpoint when explicit MCP web server settings are not provided.
+- In `example10`, `TAVILY_API_KEY` is optional. If present, it can be used to infer a live Tavily MCP web endpoint when explicit MCP web server settings are not provided.
 - `FRED_API_KEY` is optional for live macro data in `example10`.
-- In `example11`, `FRED_API_KEY` is optional. If present, it can be used to infer the bundled local macro MCP server; otherwise `example11` can still run with explicit MCP configuration or fallback behavior.
-- `example10` and `example11` can run without `OPENAI_API_KEY`. Both examples report fallback or degraded behavior explicitly when live external evidence is unavailable.
+- In `example10`, `FRED_API_KEY` is optional. If present, it can be used to infer the bundled local macro MCP server; otherwise `example10` can still run with explicit MCP configuration or fallback behavior.
+- `example10` and `example10` can run without `OPENAI_API_KEY`. Both examples report fallback or degraded behavior explicitly when live external evidence is unavailable.
 
 ## 3. Example Progression
 
@@ -243,7 +243,7 @@ EXAMPLE10_PLAIN_REPORT=1 uv run examples/example10/example10.py
 
 ### Example 11 - MCP-Native Research Orchestrator
 
-**Entry point:** `examples/example11/example11.py`
+**Entry point:** `examples/example10/example10.py`
 
 Flagship packaged orchestrator with:
 
@@ -273,16 +273,16 @@ flowchart LR
 Run:
 
 ```bash
-uv run examples/example11/example11.py "Evaluate whether current macro conditions support an equity overweight."
+uv run examples/example10/example10.py "Evaluate whether current macro conditions support an equity overweight."
 ```
 
 Plain-text report:
 
 ```bash
-EXAMPLE11_PLAIN_REPORT=1 uv run examples/example11/example11.py
+EXAMPLE10_PLAIN_REPORT=1 uv run examples/example10/example10.py
 ```
 
-`example11` configuration lives in `examples/example11/config.py`. Live MCP behavior is controlled with environment variables such as:
+`example10` configuration lives in `examples/example10/config.py`. Live MCP behavior is controlled with environment variables such as:
 
 - `EXAMPLE11_USE_MCP_LIVE`
 - `EXAMPLE11_MCP_WEB_SERVER_URL`
@@ -359,8 +359,8 @@ Because of that, the later examples are best read as architecture examples rathe
 
 Two practical notes:
 
-- `example10` and `example11` use packaged deterministic classes named as "agents," but functionally they behave more like analyzers within an orchestrator stack.
-- `example11` is designed to degrade safely when live MCP data is not available.
+- `example10` and `example10` use packaged deterministic classes named as "agents," but functionally they behave more like analyzers within an orchestrator stack.
+- `example10` is designed to degrade safely when live MCP data is not available.
 
 ## 7. Validation
 
@@ -372,7 +372,7 @@ Useful local checks:
 python -m compileall examples
 python examples/example0_setup_check.py
 EXAMPLE10_PLAIN_REPORT=1 python examples/example10/example10.py
-EXAMPLE11_PLAIN_REPORT=1 python examples/example11/example11.py
+EXAMPLE10_PLAIN_REPORT=1 python examples/example10/example10.py
 ```
 
 ## 8. Where to Start
@@ -383,7 +383,7 @@ If you are new to the repo:
 - then read `example1.py` through `example4.py`
 - jump to `example7.py` for the first meaningful team workflow
 - read `example10` for the cleanest packaged orchestrator
-- read `example11` for the flagship MCP-oriented architecture
+- read `example10` for the flagship MCP-oriented architecture
 
 ## 9. Disclaimer
 
