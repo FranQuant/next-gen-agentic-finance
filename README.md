@@ -77,17 +77,9 @@ Progression:
 
 ## 4. Shared Utility Layer
 
-### `examples/finance_tools.py`
+`examples/finance_tools.py` provides a lightweight shared tool layer used across multiple examples for market data, company snapshots, and web/news retrieval.
 
-Shared finance tool layer used by the mid-repo AGNO examples. It currently provides:
-
-- latest price snapshots
-- analyst recommendations
-- curated company info
-- normalized company news from yfinance
-- Tavily-backed company news retrieval
-
-This file is best understood as a reusable demo tool boundary for examples such as `example7` and `example9`, rather than as a general-purpose production data library.
+It is intended as a compact demo utility module, not a production SDK.
 
 ## 5. Current Repository Structure
 
