@@ -41,23 +41,21 @@ python examples/example0_setup_check.py
 
 ## 2. Environment Variables
 
-Create a `.env` file in the project root for the networked examples:
+Copy the example file and fill in the keys you want to use:
 
 ```bash
-OPENAI_API_KEY=your_key_here
-TAVILY_API_KEY=your_key_here
-FRED_API_KEY=your_key_here
+cp .env.example .env
 ```
 
-Notes:
+Common variables:
 
-OPENAI_API_KEY is used by the AGNO/OpenAI examples in examples 1–9.
+OPENAI_API_KEY — required for examples that use OpenAI models
 
-TAVILY_API_KEY is used by Tavily-backed search and web-intelligence flows.
+TAVILY_API_KEY — required for web search and news retrieval
 
-FRED_API_KEY is optional for live macro data in example10.
+FRED_API_KEY — optional, used for macro data flows
 
-example10 is designed to degrade safely when live external data is unavailable.
+Some examples may run with only a subset of these variables, depending on the tools they use. See .env.example for the current template.
 
 ## 3. Example Guide
 
