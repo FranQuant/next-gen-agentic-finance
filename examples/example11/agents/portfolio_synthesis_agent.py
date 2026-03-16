@@ -32,6 +32,7 @@ class PortfolioSynthesisAgent:
         macro_view: dict,
         history: list[RunRecord] | None = None,
     ) -> PortfolioView:
+        universe = self._normalize_universe(brief.tickers)
         score = float(web_view.get("sentiment_score", 0.0))
         score += float(market_view.get("trend_score", 0.0))
         score += float(macro_view.get("macro_score", 0.0))
@@ -52,22 +53,38 @@ class PortfolioSynthesisAgent:
             signal = "SHORT"
 
         conviction = min(0.95, max(0.2, abs(score)))
+        market_notes = market_view.get("notes", [])
+        market_data_weak = market_view.get("trend") == "unknown" or bool(market_notes)
+        if market_data_weak:
+            conviction = min(conviction, 0.35)
         if evidence_mode in {"fallback_only", "none"}:
             signal = "NEUTRAL"
             conviction = 0.2
 
-        allocations = self._build_allocations(
-            signal=signal,
-            tickers=brief.tickers,
-            conviction=conviction,
-            query=query,
-            brief=brief,
-        )
+        if not universe:
+            signal = "VIEW_ONLY"
+            conviction = 0.2
+            allocations = {"CASH": 1.0}
+        else:
+            allocations = self._build_allocations(
+                signal=signal,
+                tickers=universe,
+                conviction=conviction,
+                query=query,
+                brief=brief,
+            )
+            if self._is_cash_only(allocations):
+                signal = "NO_ACTION"
+                conviction = min(conviction, 0.25)
 
         thesis: list[str] = []
         thesis.extend(web_view.get("key_points", [])[:2])
         thesis.append(market_view.get("summary", "Market signal is mixed."))
         thesis.append(macro_view.get("summary", "Macro signal is mixed."))
+        if signal == "VIEW_ONLY":
+            thesis.insert(0, "No clean tradable universe was identified; maintain a research-only view.")
+        elif signal == "NO_ACTION":
+            thesis.insert(0, "A tradable expression was not robust enough to justify deployment; remain in cash.")
 
         risks: list[str] = []
         risks.extend(web_view.get("risks", [])[:2])
@@ -77,7 +94,11 @@ class PortfolioSynthesisAgent:
             risks.append(f"High realized volatility detected in: {joined}.")
         risks.extend(macro_view.get("risks", [])[:2])
         if evidence_mode in {"fallback_only", "none"}:
-            risks.insert(0, "Fallback-only web evidence detected; portfolio signal held neutral.")
+            risks.insert(0, "Fallback-only web evidence detected; actionable portfolio deployment was withheld.")
+        if signal == "VIEW_ONLY":
+            risks.insert(0, "No tradable universe was identified; output is research-only and non-actionable.")
+        elif signal == "NO_ACTION":
+            risks.insert(0, "No coherent tradable allocation was available; capital remains in cash.")
         if not risks:
             risks.append("Model confidence is modest because signals are lightweight.")
 
@@ -90,6 +111,14 @@ class PortfolioSynthesisAgent:
             risks=risks,
         )
 
+    def _normalize_universe(self, tickers: list[str]) -> list[str]:
+        universe: list[str] = []
+        for ticker in tickers:
+            normalized = ticker.upper()
+            if normalized not in universe:
+                universe.append(normalized)
+        return universe
+
     def _build_allocations(
         self,
         signal: str,
@@ -98,11 +127,7 @@ class PortfolioSynthesisAgent:
         query: str,
         brief: ResearchBrief,
     ) -> dict[str, float]:
-        universe: list[str] = []
-        for ticker in tickers:
-            normalized = ticker.upper()
-            if normalized not in universe:
-                universe.append(normalized)
+        universe = self._normalize_universe(tickers)
 
         if not universe:
             return {"CASH": 1.0}
@@ -310,6 +335,14 @@ class PortfolioSynthesisAgent:
             return {}
         weight = round(total_weight / len(tickers), 4)
         return {ticker: weight for ticker in tickers}
+
+    def _is_cash_only(self, allocations: dict[str, float]) -> bool:
+        if not allocations:
+            return True
+
+        non_cash = [ticker for ticker, weight in allocations.items() if ticker != "CASH" and abs(weight) > 0.0001]
+        cash_weight = float(allocations.get("CASH", 0.0))
+        return not non_cash and cash_weight >= 0.9999
 
     def _rebalance_sum_to_one(self, allocations: dict[str, float]) -> dict[str, float]:
         total = round(sum(allocations.values()), 4)
