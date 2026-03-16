@@ -39,15 +39,27 @@ _STOPWORDS = {
     "STOCK",
     "VIEW",
     "YIELD",
+    "FED",
+    "FOMC",
+    "US",
+    "USA",
+    "WEB",
+    "GIVEN",
 }
 
 
 class ResearchBriefAgent:
     INTENT_UNIVERSE = {
-        "bond": ["TLT", "IEF", "SHY", "TIP", "SPY"],
+        "bond": ["TLT", "IEF", "SHY", "TIP"],
         "equity": ["SPY", "QQQ", "IWM", "TLT"],
         "defensive": ["TLT", "SHY", "GLD", "UUP"],
         "tech": ["QQQ", "XLK", "SMH", "TLT"],
+    }
+    INTENT_TOPICS = {
+        "bond": "bond market outlook",
+        "equity": "equity market outlook",
+        "defensive": "risk-off positioning",
+        "tech": "technology sector outlook",
     }
 
     def __init__(
@@ -61,20 +73,27 @@ class ResearchBriefAgent:
         self.max_topics = max_topics
 
     def generate(self, query: str) -> ResearchBrief:
-        extracted_tickers = self._extract_tickers(query)
-        intent = self._classify_intent(query, extracted_tickers)
-        tickers = extracted_tickers or self.INTENT_UNIVERSE.get(intent, list(self.default_tickers))
-        topics = self._extract_topics(query, tickers)
-        objective = f"Build a multi-source research view for: {query.strip()}"
+        cleaned_query = query.strip()
+        explicit_tickers = self._extract_explicit_tickers(cleaned_query)
+        intent = self._classify_intent(cleaned_query, explicit_tickers)
+        tickers = self._build_tickers(explicit_tickers, intent)
+        topics = self._build_topics(cleaned_query, intent)
+        objective = f"Build a multi-source research view for: {cleaned_query}"
         constraints = [
             "Use only available evidence and adapter outputs.",
             "Keep assumptions explicit and minimal.",
             f"Intent lens: {intent}.",
             "Capability transport: MCP-native adapters.",
         ]
+        if explicit_tickers:
+            constraints.append("Universe mode: explicit tickers only.")
+        elif tickers:
+            constraints.append("Universe mode: intent-default tradable basket.")
+        else:
+            constraints.append("Universe mode: view-first; no clean tradable universe identified.")
 
         return ResearchBrief(
-            query=query.strip(),
+            query=cleaned_query,
             objective=objective,
             topics=topics,
             tickers=tickers,
@@ -82,9 +101,11 @@ class ResearchBriefAgent:
             constraints=constraints,
         )
 
-    def _extract_tickers(self, query: str) -> list[str]:
-        candidates = re.findall(r"\b[A-Za-z]{1,5}\b", query)
+    def _extract_explicit_tickers(self, query: str) -> list[str]:
         tickers: list[str] = []
+        candidates = re.findall(r"\$([A-Za-z]{1,5})\b", query)
+        candidates.extend(re.findall(r"\b([A-Z]{2,5})\b", query))
+
         for candidate in candidates:
             normalized = candidate.upper()
             if normalized in _STOPWORDS:
@@ -93,12 +114,30 @@ class ResearchBriefAgent:
                 tickers.append(normalized)
         return tickers
 
-    def _extract_topics(self, query: str, tickers: list[str]) -> list[str]:
+    def _build_tickers(self, explicit_tickers: list[str], intent: str) -> list[str]:
+        if explicit_tickers:
+            return explicit_tickers
+
+        return list(self.INTENT_UNIVERSE.get(intent, []))
+
+    def _build_topics(self, query: str, intent: str) -> list[str]:
         cleaned = query.strip().rstrip("?.!")
         topics = [cleaned] if cleaned else []
 
-        for ticker in tickers:
-            topics.append(f"{ticker} outlook")
+        if intent in self.INTENT_TOPICS:
+            topics.append(self.INTENT_TOPICS[intent])
+
+        normalized = cleaned.lower()
+        if "inflation" in normalized:
+            topics.append("inflation outlook")
+        if "fed" in normalized or "federal reserve" in normalized or "policy rate" in normalized:
+            topics.append("Federal Reserve policy outlook")
+        if "uncertainty" in normalized:
+            topics.append("macro uncertainty")
+        if "yield" in normalized or "treasury" in normalized or "treasuries" in normalized:
+            topics.append("Treasury yield outlook")
+        if "growth" in normalized or "recession" in normalized:
+            topics.append("growth and recession risk")
 
         topics.append("macro regime")
 
@@ -154,10 +193,10 @@ class ResearchBriefAgent:
             "nasdaq",
         )
 
-        scores["bond"] += sum(term in normalized for term in bond_terms)
-        scores["equity"] += sum(term in normalized for term in equity_terms)
-        scores["defensive"] += sum(term in normalized for term in defensive_terms)
-        scores["tech"] += sum(term in normalized for term in tech_terms)
+        scores["bond"] += sum(self._contains_term(normalized, term) for term in bond_terms)
+        scores["equity"] += sum(self._contains_term(normalized, term) for term in equity_terms)
+        scores["defensive"] += sum(self._contains_term(normalized, term) for term in defensive_terms)
+        scores["tech"] += sum(self._contains_term(normalized, term) for term in tech_terms)
 
         for ticker in extracted_tickers:
             upper = ticker.upper()
@@ -172,6 +211,9 @@ class ResearchBriefAgent:
                 scores["equity"] += 1
 
         if all(value == 0 for value in scores.values()):
-            return "equity"
+            return "macro"
 
         return max(scores, key=scores.get)
+
+    def _contains_term(self, text: str, term: str) -> bool:
+        return bool(re.search(rf"\b{re.escape(term.lower())}\b", text))
