@@ -41,21 +41,17 @@ python examples/example0_setup_check.py
 
 ## 2. Environment Variables
 
-Copy the example file and fill in the keys you want to use:
-
 ```bash
 cp .env.example .env
 ```
 
-Common variables:
+Set the keys needed for the examples you want to run:
 
-OPENAI_API_KEY — required for examples that use OpenAI models
+* `OPENAI_API_KEY` — OpenAI-powered examples
+* `TAVILY_API_KEY` — web search and news retrieval
+* `FRED_API_KEY` — optional macro data flows
 
-TAVILY_API_KEY — required for web search and news retrieval
-
-FRED_API_KEY — optional, used for macro data flows
-
-Some examples may run with only a subset of these variables, depending on the tools they use. See .env.example for the current template.
+See `.env.example` for the current template.
 
 ## 3. Example Guide
 
