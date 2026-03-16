@@ -5,9 +5,9 @@ import sys
 from typing import Any
 
 try:
-    from .team import build_example11_system
+    from .team import build_example10_system
 except ImportError:  # pragma: no cover
-    from team import build_example11_system
+    from team import build_example10_system
 
 try:
     from rich import box
@@ -160,7 +160,7 @@ def main() -> None:
     if not query:
         query = "Evaluate whether current macro conditions support an equity overweight."
 
-    system = build_example11_system()
+    system = build_example10_system()
     packet = system.run(query)
 
     force_plain = os.getenv("EXAMPLE11_PLAIN_REPORT", "").strip() == "1"

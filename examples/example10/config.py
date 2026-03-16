@@ -10,7 +10,7 @@ from urllib.parse import quote_plus
 
 @dataclass(frozen=True)
 class Example11Config:
-    db_path: str = "tmp/example11_runs.db"
+    db_path: str = "tmp/example10_runs.db"
     history_limit: int = 5
     top_topics: int = 4
     default_tickers: tuple[str, ...] = ("SPY", "QQQ", "TLT")
@@ -89,7 +89,7 @@ def load_config() -> Example11Config:
     enable_extract = _parse_bool_env(os.getenv("EXAMPLE11_MCP_WEB_ENABLE_EXTRACT_ENRICHMENT"), default=True)
 
     return Example11Config(
-        db_path=os.getenv("EXAMPLE11_DB_PATH", "tmp/example11_runs.db"),
+        db_path=os.getenv("EXAMPLE10_DB_PATH", "tmp/example10_runs.db"),
         history_limit=int(os.getenv("EXAMPLE11_HISTORY_LIMIT", "5")),
         top_topics=int(os.getenv("EXAMPLE11_TOP_TOPICS", "4")),
         mcp_server_url=mcp_server_url,

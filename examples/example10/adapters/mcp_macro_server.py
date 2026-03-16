@@ -20,7 +20,7 @@ DEFAULT_INDICATORS = (
     "10y_yield",
 )
 
-server = FastMCP(name="example11-macro")
+server = FastMCP(name="example10-macro")
 
 
 @lru_cache(maxsize=1)

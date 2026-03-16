@@ -29,7 +29,7 @@ except ImportError:  # pragma: no cover
 load_dotenv()
 
 
-def build_example11_system() -> ResearchOrchestrator:
+def build_example10_system() -> ResearchOrchestrator:
     config = load_config()
 
     return ResearchOrchestrator(
