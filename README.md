@@ -25,14 +25,27 @@ It is intended for experimentation, learning, and architectural reference rather
 
 ## 1. Setup
 
-This project uses `uv`.
+### Prerequisites
+
+Install `uv` first if it is not already available on your system:
 
 ```bash
-uv sync
-source .venv/bin/activate
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
+uv --version
 ```
 
-Minimal sanity check:
+### Clone and install
+
+```bash
+git clone https://github.com/FranQuant/next-gen-agentic-finance.git
+cd next-gen-agentic-finance
+uv venv .venv
+source .venv/bin/activate
+uv sync
+```
+
+### Minimal setup check
 
 ```bash
 python examples/example0_setup_check.py
@@ -41,8 +54,7 @@ python examples/example0_setup_check.py
 Expected output:
 
 ```text
-Agno demo environment setup successful.
-Agent name: FS
+minimal Agno setup check passed
 ```
 
 ## 2. Environment Variables
@@ -55,13 +67,15 @@ TAVILY_API_KEY=your_key_here
 FRED_API_KEY=your_key_here
 ```
 
-| Variable | Used by | Notes |
-| --- | --- | --- |
-| `OPENAI_API_KEY` | Examples `1` through `9` | Required for the AGNO/OpenAI demos. |
-| `TAVILY_API_KEY` | Examples `2`, `3`, `4`, `7`, `9`, `10` | Used for Tavily-backed search and news; in `example10` it can also infer a live MCP web endpoint when not explicitly configured. |
-| `FRED_API_KEY` | `example10` | Optional; enables the bundled local macro MCP path for live macro retrieval. |
+Notes:
 
-`example10` can run without `OPENAI_API_KEY` and reports degraded or fallback behavior explicitly when live external evidence is unavailable.
+OPENAI_API_KEY is used by the AGNO/OpenAI examples in examples 1–9.
+
+TAVILY_API_KEY is used by Tavily-backed search and web-intelligence flows.
+
+FRED_API_KEY is optional for live macro data in example10.
+
+example10 is designed to degrade safely when live external data is unavailable.
 
 ## 3. Example Guide
 
