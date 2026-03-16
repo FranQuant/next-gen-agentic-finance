@@ -80,7 +80,7 @@ It is intended as a compact demo utility module, not a production SDK.
 ## 5. Current Repository Structure
 
 ```text
-agentic_finance/
+next-gen-agentic-finance/
 ├── data/
 ├── examples/
 │   ├── example0_setup_check.py
