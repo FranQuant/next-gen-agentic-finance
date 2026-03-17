@@ -57,11 +57,14 @@ class PortfolioSynthesisAgent:
         market_data_weak = market_view.get("trend") == "unknown" or bool(market_notes)
         if market_data_weak:
             conviction = min(conviction, 0.35)
-        if evidence_mode in {"fallback_only", "none"}:
+        degraded_evidence = evidence_mode in {"fallback_only", "none"}
+        if degraded_evidence:
             signal = "NEUTRAL"
             conviction = 0.2
 
-        if not universe:
+        if degraded_evidence:
+            allocations = {"CASH": 1.0}
+        elif not universe:
             signal = "VIEW_ONLY"
             conviction = 0.2
             allocations = {"CASH": 1.0}
@@ -81,7 +84,9 @@ class PortfolioSynthesisAgent:
         thesis.extend(web_view.get("key_points", [])[:2])
         thesis.append(market_view.get("summary", "Market signal is mixed."))
         thesis.append(macro_view.get("summary", "Macro signal is mixed."))
-        if signal == "VIEW_ONLY":
+        if degraded_evidence:
+            thesis.insert(0, "Live web evidence was unavailable; output is research-only and non-actionable.")
+        elif signal == "VIEW_ONLY":
             thesis.insert(0, "No clean tradable universe was identified; maintain a research-only view.")
         elif signal == "NO_ACTION":
             thesis.insert(0, "A tradable expression was not robust enough to justify deployment; remain in cash.")
@@ -166,7 +171,7 @@ class PortfolioSynthesisAgent:
             hedge_targets = secondary or defensives
 
             allocations = self._allocate_bucket(short_targets, -short_total)
-            hedge_total = round(1.0 - short_total, 4)
+            hedge_total = round(1.0 + short_total, 4)
             if hedge_targets:
                 allocations.update(self._allocate_bucket(hedge_targets, hedge_total))
             else:
