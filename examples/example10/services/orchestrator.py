@@ -86,10 +86,14 @@ class ResearchOrchestrator:
         )
 
         web_report = dict(getattr(self.mcp_web_adapter, "last_search_report", {}) or {})
+        market_report = dict(getattr(self.market_adapter, "last_fetch_report", {}) or {})
         macro_report = dict(getattr(self.mcp_macro_adapter, "last_fetch_report", {}) or {})
         web_mode = str(web_view.get("evidence_mode") or web_report.get("mode") or "unknown")
+        market_mode = str(market_report.get("mode") or "unknown")
         macro_mode = str(macro_report.get("mode") or "unknown")
-        degraded = bool(web_report.get("fallback_used") or macro_report.get("fallback_used"))
+        degraded = bool(
+            web_report.get("fallback_used") or market_report.get("fallback_used") or macro_report.get("fallback_used")
+        )
         neutralized = web_mode in {"fallback_only", "none"}
 
         packet = ResearchPacket(
@@ -111,9 +115,11 @@ class ResearchOrchestrator:
                 "capabilities": ["web", "macro", "local-market"],
                 "degraded": degraded,
                 "web_mode": web_mode,
+                "market_mode": market_mode,
                 "macro_mode": macro_mode,
                 "neutralized_for_fallback": neutralized,
                 "web_report": web_report,
+                "market_report": market_report,
                 "macro_report": macro_report,
             },
         )

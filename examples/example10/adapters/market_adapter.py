@@ -17,9 +17,13 @@ class MarketAdapter:
             self._yf = yf
         except Exception:
             self._yf = None
+        self.last_fetch_report = self._new_fetch_report()
 
     def get_snapshot(self, tickers: list[str], lookback_days: int = 60) -> MarketSnapshot:
+        report = self._new_fetch_report()
         if not tickers:
+            report["mode"] = "market-empty"
+            self.last_fetch_report = report
             return MarketSnapshot(
                 tickers=[],
                 as_of=self._now_iso(),
@@ -34,12 +38,14 @@ class MarketAdapter:
         vol_20d: dict[str, float] = {}
         notes: list[str] = []
 
-        for ticker in tickers:
-            normalized = ticker.upper()
+        normalized_tickers = [ticker.upper() for ticker in tickers]
+        for normalized in normalized_tickers:
             if not self._yf:
                 prices[normalized] = self._fallback_price(normalized)
                 returns_20d[normalized] = 0.0
                 vol_20d[normalized] = 0.2
+                report["fallback_used"] = True
+                self._append_ticker(report["placeholder_tickers"], normalized)
                 self._append_note(notes, "yfinance unavailable; using deterministic placeholders.")
                 continue
 
@@ -61,10 +67,20 @@ class MarketAdapter:
                 prices[normalized] = self._fallback_price(normalized)
                 returns_20d[normalized] = 0.0
                 vol_20d[normalized] = 0.2
+                report["fallback_used"] = True
+                self._append_ticker(report["failed_tickers"], normalized)
+                self._append_ticker(report["placeholder_tickers"], normalized)
                 notes.append(f"{normalized}: market fetch failed ({exc}); placeholder used.")
 
+        placeholder_count = len(report["placeholder_tickers"])
+        if placeholder_count == len(normalized_tickers):
+            report["mode"] = "market-placeholder"
+        elif placeholder_count:
+            report["mode"] = "market-partial-fallback"
+        self.last_fetch_report = report
+
         return MarketSnapshot(
-            tickers=[ticker.upper() for ticker in tickers],
+            tickers=normalized_tickers,
             as_of=self._now_iso(),
             prices=prices,
             returns_20d=returns_20d,
@@ -79,6 +95,18 @@ class MarketAdapter:
     def _append_note(self, notes: list[str], note: str) -> None:
         if note not in notes:
             notes.append(note)
+
+    def _append_ticker(self, tickers: list[str], ticker: str) -> None:
+        if ticker not in tickers:
+            tickers.append(ticker)
+
+    def _new_fetch_report(self) -> dict[str, bool | str | list[str]]:
+        return {
+            "fallback_used": False,
+            "mode": "market-live",
+            "failed_tickers": [],
+            "placeholder_tickers": [],
+        }
 
     def _now_iso(self) -> str:
         return datetime.now(timezone.utc).isoformat()

@@ -24,6 +24,7 @@ def _status_lines(packet: Any) -> list[str]:
     metadata = getattr(packet, "metadata", {}) or {}
     web_view = getattr(packet, "web_view", {}) or {}
     web_mode = str(metadata.get("web_mode") or web_view.get("evidence_mode") or "unknown")
+    market_mode = str(metadata.get("market_mode") or "unknown")
     macro_mode = str(metadata.get("macro_mode") or "unknown")
     degraded = bool(metadata.get("degraded"))
     neutralized = bool(metadata.get("neutralized_for_fallback"))
@@ -40,6 +41,17 @@ def _status_lines(packet: Any) -> list[str]:
         lines.append("Web Evidence: no usable web evidence was retrieved.")
     else:
         lines.append(f"Web Evidence: {web_mode}.")
+
+    if market_mode == "market-placeholder":
+        lines.append("Market Data: deterministic placeholder values were used for all requested tickers.")
+    elif market_mode == "market-partial-fallback":
+        lines.append("Market Data: live fetch was incomplete; placeholder values were used for some tickers.")
+    elif market_mode == "market-live":
+        lines.append("Market Data: live yfinance snapshot.")
+    elif market_mode == "market-empty":
+        lines.append("Market Data: no tickers were requested.")
+    elif market_mode != "unknown":
+        lines.append(f"Market Data: {market_mode}.")
 
     if macro_mode == "mcp-fallback":
         lines.append("Macro Data: fallback baseline values were used.")
