@@ -105,6 +105,12 @@ next-gen-agentic-finance/
 - Start with `example1.py` to `example4.py` for foundations.
 - Use `example10` for the MCP-native finance research capstone.
 
+## Example10 Run Modes
+
+- By default, `example10` runs in a local/degraded mode: it still works without live MCP services, but web and macro inputs may fall back and market data may use placeholders.
+- To enable live MCP mode, set `EXAMPLE10_USE_MCP_LIVE=1` and provide reachable MCP settings through `EXAMPLE10_MCP_WEB_*`, `EXAMPLE10_MCP_MACRO_*`, or a shared `EXAMPLE10_MCP_SERVER_URL`.
+- `TAVILY_API_KEY` and `FRED_API_KEY` support the live web and macro paths; see `.env.example` for the relevant `EXAMPLE10_*` overrides.
+
 ## Quick Preview
 
 ![Example10 demo](docs/example10_demo.gif)
