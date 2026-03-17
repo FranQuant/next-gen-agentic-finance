@@ -175,7 +175,7 @@ def main() -> None:
     system = build_example10_system()
     packet = system.run(query)
 
-    force_plain = os.getenv("EXAMPLE11_PLAIN_REPORT", "").strip() == "1"
+    force_plain = os.getenv("EXAMPLE10_PLAIN_REPORT", "").strip() == "1"
     if _HAS_RICH and not force_plain:
         _render_rich(packet)
     else:

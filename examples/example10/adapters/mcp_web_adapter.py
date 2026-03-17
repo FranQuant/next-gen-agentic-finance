@@ -36,9 +36,9 @@ class _MCPClient:
             raise RuntimeError("MCP live mode disabled.")
 
         if self.transport in {"stdio", "command"} and not self.server_command:
-            raise RuntimeError("MCP stdio transport requires EXAMPLE11_MCP_WEB_SERVER_COMMAND.")
+            raise RuntimeError("MCP stdio transport requires EXAMPLE10_MCP_WEB_SERVER_COMMAND.")
         if self.transport in {"streamable_http", "http", "sse"} and not self.server_url:
-            raise RuntimeError("MCP URL transport requires EXAMPLE11_MCP_WEB_SERVER_URL.")
+            raise RuntimeError("MCP URL transport requires EXAMPLE10_MCP_WEB_SERVER_URL.")
 
         return asyncio.run(self._call_tool_async(tool_name=tool_name, payload=payload))
 

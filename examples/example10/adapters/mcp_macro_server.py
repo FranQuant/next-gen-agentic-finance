@@ -27,7 +27,7 @@ server = FastMCP(name="example10-macro")
 def _fred_client():
     api_key = (os.getenv("FRED_API_KEY") or "").strip()
     if not api_key:
-        raise RuntimeError("FRED_API_KEY is required for the Example11 macro MCP server.")
+        raise RuntimeError("FRED_API_KEY is required for the Example10 macro MCP server.")
 
     from fredapi import Fred
 
