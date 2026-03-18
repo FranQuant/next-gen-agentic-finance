@@ -107,9 +107,10 @@ next-gen-agentic-finance/
 
 ## Example10 Run Modes
 
-- By default, `example10` runs in a local/degraded mode: it still works without live MCP services, but web and macro inputs may fall back and market data may use placeholders.
-- To enable live MCP mode, set `EXAMPLE10_USE_MCP_LIVE=1` and provide reachable MCP settings through `EXAMPLE10_MCP_WEB_*`, `EXAMPLE10_MCP_MACRO_*`, or a shared `EXAMPLE10_MCP_SERVER_URL`.
-- `TAVILY_API_KEY` and `FRED_API_KEY` support the live web and macro paths; see `.env.example` for the relevant `EXAMPLE10_*` overrides.
+- On a typical fresh run, `example10` behaves in a local/degraded mode: it still works without live MCP services, but web and macro inputs may fall back and market data may use placeholders.
+- Set `EXAMPLE10_USE_MCP_LIVE=1` to explicitly enable live MCP mode.
+- Compatible `EXAMPLE10_MCP_*` settings and available credentials such as `TAVILY_API_KEY` and `FRED_API_KEY` may also cause live MCP mode to be inferred automatically after `.env` loading.
+- Set `EXAMPLE10_USE_MCP_LIVE=0` to force local/degraded mode even when compatible MCP settings or credentials are present.
 
 ## Quick Preview
 
