@@ -1,5 +1,6 @@
 """Example 6: maximum pain analysis agent for listed options expirations."""
 
+import os
 from textwrap import dedent
 
 from dotenv import load_dotenv
@@ -13,6 +14,8 @@ from agno.models.openai import OpenAIResponses
 from agno.tools import tool
 
 load_dotenv()
+
+MODEL_ID = os.getenv("EXAMPLE6_MODEL_ID", os.getenv("OPENAI_MODEL_ID", "gpt-5.4"))
 
 
 def compute_max_pain_from_chain(calls: pd.DataFrame, puts: pd.DataFrame) -> float:
@@ -72,26 +75,26 @@ def maximum_pain_level(symbol: str, expiration: str) -> str:
 
 def build_agent() -> Agent:
     return Agent(
-        model=OpenAIResponses(id="gpt-5.4"),
+        model=OpenAIResponses(id=MODEL_ID),
         tools=[maximum_pain_level],
         tool_choice="auto",
         markdown=True,
         instructions=dedent("""\
             You are an options microstructure assistant specialized in maximum pain analysis.
 
-            When the user asks about maximum pain:
-            1. Always call the maximum_pain_level tool.
-            2. Read the tool output carefully.
-            3. If the tool returns a valid result, respond in this format:
+            For any maximum pain request, always call the maximum_pain_level tool.
+            Treat the tool output as the source of truth.
+            Do not invent unavailable expirations or maximum pain results.
 
-               **Maximum Pain Result:** <tool_output>
+            If the tool returns a valid result, respond in this format:
 
-               Maximum pain is the strike where aggregate option-holder payout at expiry is minimized based on open interest.
-               It is a heuristic microstructure indicator, not a forecast.
+            **Maximum Pain Result:** <tool_output>
 
-            4. If the tool reports an invalid or unavailable expiration, do not invent a result.
-               State the issue clearly and preserve the listed available expirations from the tool output.
-            5. Do not add filler text.
+            Maximum pain is the strike where aggregate option-holder payout at expiry is minimized based on open interest.
+            It is a heuristic microstructure indicator, not a forecast.
+
+            If the tool reports an invalid expiration, unavailable data, or a fetch failure, state the issue clearly using the tool output.
+            Do not add filler text.
         """),
     )
 
