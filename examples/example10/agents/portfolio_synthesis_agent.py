@@ -33,26 +33,60 @@ class PortfolioSynthesisAgent:
         history: list[RunRecord] | None = None,
     ) -> PortfolioView:
         universe = self._normalize_universe(brief.tickers)
-        score = float(web_view.get("sentiment_score", 0.0))
-        score += float(market_view.get("trend_score", 0.0))
-        score += float(macro_view.get("macro_score", 0.0))
-        score += 0.25 * self._intent_bias(query)
+        web_score = float(web_view.get("sentiment_score", 0.0))
+        market_score = float(market_view.get("trend_score", 0.0))
+        macro_score = float(macro_view.get("macro_score", 0.0))
+        intent_score = 0.15 * self._intent_bias(query)
+
+        web_sentiment = str(web_view.get("sentiment", "mixed")).lower()
+        if web_sentiment in {"mixed", "neutral"}:
+            web_score *= 0.45
+        elif web_sentiment == "unavailable":
+            web_score = 0.0
+
+        market_trend = str(market_view.get("trend", "")).lower()
+        if market_trend == "downtrend":
+            market_score = min(market_score, -0.18)
+        elif market_trend == "uptrend":
+            market_score = max(market_score, 0.12)
+
+        macro_regime = str(macro_view.get("regime", macro_view.get("summary", ""))).lower()
+        if "mixed" in macro_regime or "mid-cycle" in macro_regime or "mid cycle" in macro_regime:
+            macro_score *= 0.5
+
+        score = web_score + market_score + macro_score + intent_score
 
         if history:
             last_signal = history[0].portfolio_signal.upper()
-            if last_signal == "LONG" and score > 0:
-                score += 0.03
-            if last_signal == "SHORT" and score < 0:
-                score -= 0.03
+            if last_signal == "LONG" and score > 0.25:
+                score += 0.02
+            if last_signal == "SHORT" and score < -0.25:
+                score -= 0.02
 
         evidence_mode = str(web_view.get("evidence_mode", "live"))
         signal = "NEUTRAL"
-        if score >= 0.15:
+        # Mixed cross-signals should resolve conservatively; directional stances require clearer alignment and stronger net evidence.
+        if score >= 0.28:
             signal = "LONG"
-        elif score <= -0.15:
+        elif score <= -0.28:
             signal = "SHORT"
 
-        conviction = min(0.95, max(0.2, abs(score)))
+        component_directions = [
+            self._direction_bucket(web_score),
+            self._direction_bucket(market_score),
+            self._direction_bucket(macro_score),
+        ]
+        non_zero_directions = [direction for direction in component_directions if direction != 0]
+        aligned_components = bool(non_zero_directions) and len(set(non_zero_directions)) == 1
+
+        conviction = 0.2 + (0.4 * min(abs(score), 1.0))
+        if aligned_components and len(non_zero_directions) >= 2:
+            conviction += 0.08
+        elif len(set(non_zero_directions)) > 1:
+            conviction -= 0.12
+        if signal == "NEUTRAL":
+            conviction = min(conviction, 0.4)
+        conviction = min(0.85, max(0.2, conviction))
         market_notes = market_view.get("notes", [])
         market_data_weak = market_view.get("trend") == "unknown" or bool(market_notes)
         if market_data_weak:
@@ -123,6 +157,13 @@ class PortfolioSynthesisAgent:
             if normalized not in universe:
                 universe.append(normalized)
         return universe
+
+    def _direction_bucket(self, value: float) -> int:
+        if value >= 0.08:
+            return 1
+        if value <= -0.08:
+            return -1
+        return 0
 
     def _build_allocations(
         self,
