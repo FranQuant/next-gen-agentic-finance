@@ -178,11 +178,12 @@ class PortfolioSynthesisAgent:
                 allocations["CASH"] = hedge_total
             return self._rebalance_sum_to_one(allocations)
 
-        cash_weight = round(self._clamp(0.70 + (0.20 * (1.0 - conviction)), 0.65, 0.90), 4)
+        # Live NEUTRAL means cautious but still invested; degraded/fallback neutralization remains the truly defensive cash-heavy case.
+        cash_weight = round(self._clamp(0.605 - (0.30 * conviction), 0.35, 0.55), 4)
         active_total = round(1.0 - cash_weight, 4)
 
         allocations = {"CASH": cash_weight}
-        preferred_share = self._clamp(0.70 + 0.10 * conviction, 0.65, 0.80)
+        preferred_share = self._clamp(0.58 + 0.18 * conviction, 0.58, 0.75)
         preferred_total = round(active_total * preferred_share, 4)
         secondary_total = round(active_total - preferred_total, 4)
         allocations.update(self._allocate_bucket(preferred, preferred_total))
