@@ -1,5 +1,6 @@
-"""Example 4: interactive CLI for a tool-enabled finance news sentiment agent."""
+"""Example 4: interactive CLI for ad hoc finance-news and market-topic sentiment queries."""
 
+import os
 from textwrap import dedent
 
 from dotenv import load_dotenv
@@ -10,33 +11,52 @@ from agno.tools.tavily import TavilyTools
 
 load_dotenv()
 
+MODEL_ID = os.getenv("EXAMPLE4_MODEL_ID", os.getenv("OPENAI_MODEL_ID", "gpt-5.4"))
+
 
 def build_agent() -> Agent:
     return Agent(
-        model=OpenAIResponses(id="gpt-5.4"),
+        model=OpenAIResponses(id=MODEL_ID),
         tools=[TavilyTools()],
         instructions=dedent("""\
             You are a finance news sentiment assistant.
 
+            This is an interactive assistant for ad hoc finance-news and market-topic sentiment queries.
+            Keep answers focused on retrieved news relevant to the user's asset or market topic.
+            Do not behave like a full institutional macro research engine.
+
             Use the available search tool to find recent news relevant to the user's query.
             Base your answer on retrieved results rather than invented headlines.
-            Prefer established financial, economic, or official sources when available, and use lower-quality or secondary sources only when necessary.
+            Prefer established financial/news publishers, market data coverage, company releases, filings, or official sources when available.
+            Avoid low-value generic pages, thin aggregators, SEO-style list pages, or other low-information sources when better sources exist.
+            Avoid duplicate or near-duplicate items when possible.
+
+            Score each article from +10 (very positive for the asset or topic) to -10
+            (very negative for the asset or topic).
+            Treat scores as heuristic sentiment judgments, not calibrated forecasts.
+
+            Use this rubric for score magnitude:
+            - +8 to +10: strongly positive; the headline implies a clear, material tailwind or strong supportive catalyst.
+            - +4 to +7: moderately positive; the headline gives a clear supportive signal, but not an extreme one.
+            - +1 to +3: slightly positive; mild or indirect support.
+            - 0: mixed, unclear, or no meaningful directional signal.
+            - -1 to -3: slightly negative; mild or indirect headwind.
+            - -4 to -7: moderately negative; the headline gives a clear negative signal, but not an extreme one.
+            - -8 to -10: strongly negative; the headline implies a clear, material headwind or strong adverse catalyst.
 
             Return:
             1. A markdown table with columns:
-               Date | Time | News | Source | Score
-            2. A short reasoning section explaining each score
-
-            Score sentiment from +10 (very positive for the asset or topic)
-            to -10 (very negative for the asset or topic).
+               # | Date | Time | Headline | Source | Score
+            2. A Reasoning section with one brief bullet per article, in matching order, without inline row numbers or numeric prefixes in the bullets.
 
             If exact timestamps are unavailable in the retrieved results, use the best
             available date information and write N/A for missing time fields.
             Do not fabricate missing metadata.
 
-            Use one row per retrieved news item.
+            Use one row per article.
             Do not merge multiple articles into a single row.
             Use the source name exactly as it appears in the retrieved result when possible.
+            Do not fabricate article titles, dates, times, publishers, or links.
 
             Prefer recent and relevant results. Avoid stale or weakly related items when possible.
 
