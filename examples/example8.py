@@ -1,5 +1,6 @@
 """Example 8: persistent multi-agent investment memo workflow with visible reasoning."""
 
+import os
 from textwrap import dedent
 
 from dotenv import load_dotenv
@@ -11,7 +12,15 @@ from agno.team import Team
 from agno.tools.reasoning import ReasoningTools
 from agno.tools.yfinance import YFinanceTools
 
+from finance_tools import get_company_news_tavily
+
 load_dotenv()
+
+DEFAULT_MODEL_ID = os.getenv("EXAMPLE8_MODEL_ID", os.getenv("OPENAI_MODEL_ID", "gpt-5.4"))
+MARKET_DATA_MODEL_ID = os.getenv("EXAMPLE8_MARKET_DATA_MODEL_ID", DEFAULT_MODEL_ID)
+NEWS_CATALYST_MODEL_ID = os.getenv("EXAMPLE8_NEWS_CATALYST_MODEL_ID", DEFAULT_MODEL_ID)
+STRATEGY_NOTE_MODEL_ID = os.getenv("EXAMPLE8_STRATEGY_NOTE_MODEL_ID", DEFAULT_MODEL_ID)
+TEAM_MODEL_ID = os.getenv("EXAMPLE8_TEAM_MODEL_ID", DEFAULT_MODEL_ID)
 
 
 def build_team() -> Team:
@@ -26,7 +35,7 @@ def build_team() -> Team:
     market_data_agent = Agent(
         name="market-data-agent",
         role="Structured market and financial snapshot specialist",
-        model=OpenAIResponses(id="gpt-5.4"),
+        model=OpenAIResponses(id=MARKET_DATA_MODEL_ID),
         tools=[YFinanceTools()],
         instructions=dedent("""
             You are an expert market data analyst.
@@ -37,6 +46,8 @@ def build_team() -> Team:
             If a field definition, time period, or calculation basis is unclear from the
             tool output, label it as unclear.
             Do not provide business commentary, catalysts, thesis language, or recommendations.
+            Keep data-supported observations separate from interpretation.
+            Do not infer a thesis from the returned data.
 
             Focus only on:
             - price snapshot
@@ -58,24 +69,31 @@ def build_team() -> Team:
     news_catalyst_agent = Agent(
         name="news-catalyst-agent",
         role="Company news and catalyst retrieval specialist",
-        model=OpenAIResponses(id="gpt-5.4"),
-        tools=[YFinanceTools(include_tools=["get_company_news"])],
+        model=OpenAIResponses(id=NEWS_CATALYST_MODEL_ID),
+        tools=[get_company_news_tavily],
         instructions=dedent("""
             You retrieve recent company-specific news and catalyst context only.
 
             ALWAYS use tools when retrieving news.
             Never fabricate stories or catalysts.
-            Prefer company-specific items over generic market or sector headlines.
+            Use the custom company-news retrieval tool for recent company-specific news.
+            Prefer clearly material company news over generic market or sector headlines.
+            Focus on catalysts, management commentary, regulatory or legal items,
+            product or company announcements, and strategic updates.
+            Explicitly flag weak, noisy, tangential, or low-confidence news when it appears.
             If returned news is weak, generic, contaminated, or not sufficiently
             company-specific, say so explicitly.
+            Do not elevate weak or noisy items into meaningful catalysts.
 
             Return:
             - recent relevant stories if available
             - a short catalyst summary only if clearly supported by the returned news
+            - explicit notes on management commentary, regulatory or legal items,
+              product announcements, and strategic updates when present
             - an explicit statement when news quality is weak or insufficient
 
             Do not discuss valuation, broader strategy, or investment recommendations.
-            Keep the summary concise and factual.
+            Keep the summary concise, factual, and grounded only in returned tool results.
         """),
         markdown=True,
     )
@@ -86,7 +104,7 @@ def build_team() -> Team:
     strategy_agent = Agent(
         name="strategy-note-agent",
         role="Institutional strategy memo writer",
-        model=OpenAIResponses(id="gpt-5.4"),
+        model=OpenAIResponses(id=STRATEGY_NOTE_MODEL_ID),
         instructions=dedent("""
             You write an institutional-style strategy memo from the provided context only.
 
@@ -98,9 +116,10 @@ def build_team() -> Team:
             - suggest only high-level trade expression ideas
             - explain what would invalidate the thesis
             - clearly separate direct observations from inference
+            - clearly separate data-supported observations from interpretation
 
             Keep scenarios illustrative unless the inputs support more precision.
-            Keep trade expression ideas conceptual and non-prescriptive.
+            Keep trade expression ideas conceptual, conditional, and non-prescriptive.
             Use restrained professional language over overconfident conclusions.
 
             Do not invent missing facts, peer comparisons, management guidance,
@@ -118,7 +137,7 @@ def build_team() -> Team:
     # -----------------------------
     investment_memo_team = Team(
         name="Investment Memo Workflow Team",
-        model=OpenAIResponses(id="gpt-5.4"),
+        model=OpenAIResponses(id=TEAM_MODEL_ID),
         members=[market_data_agent, news_catalyst_agent, strategy_agent],
         tools=[ReasoningTools(add_instructions=True)],
         instructions=dedent("""
@@ -136,6 +155,7 @@ def build_team() -> Team:
             Clearly separate structured financial observations, catalyst / news context,
             and interpretation.
             Distinguish data-supported observations from interpretation.
+            Explicitly flag weak, noisy, generic, or insufficiently company-specific news.
             You may derive simple arithmetic or comparisons directly from returned values.
             Do not invent missing facts, numbers, or unsupported precision.
             Keep scenario analysis illustrative unless the inputs support more precision.
@@ -166,7 +186,7 @@ def build_team() -> Team:
 def main() -> None:
     team = build_team()
     team.print_response(
-        "Perform a comprehensive institutional-style analysis for NU.",
+        "Perform a comprehensive institutional-style analysis for AAPL.",
         stream=True,
         show_full_reasoning=True,
     )
