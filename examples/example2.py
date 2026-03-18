@@ -17,7 +17,7 @@ SEARCH_PROMPT = "What are the latest news on gold?"
 
 def build_agent() -> Agent:
     return Agent(
-        model=OpenAIResponses(id=MODEL_ID),
+        model=OpenAIResponses(id=MODEL_ID),    
         tools=[TavilyTools()],
         instructions=dedent("""\
             You are a finance news sentiment assistant.
