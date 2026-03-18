@@ -1,13 +1,13 @@
-"""Example 0: minimal Agno installation and environment sanity check."""
+"""Example 0: minimal Agno installation sanity check."""
 
+try:
+    from agno.agent import Agent
+except ImportError:
+    print("Agno is not installed or could not be imported. Install the base Agno package and rerun this example.")
+    raise SystemExit(1)
 
-from agno.agent import Agent
+agent = Agent(name="SetupCheck")
 
-# Simple test agent for your setup
-agent = Agent(
-    name="SetupCheck",
-    description="A simple test agent running in my custom quant environment."
-)
-
-print("minimal Agno setup check passed")
+print("Base Agno installation check passed.")
+print("This example verifies base Agno installation only. It does not test model providers, external APIs, or network retrieval.")
 print(f"Agent name: {agent.name}")
