@@ -95,6 +95,40 @@ class ResearchOrchestrator:
             web_report.get("fallback_used") or market_report.get("fallback_used") or macro_report.get("fallback_used")
         )
         neutralized = web_mode in {"fallback_only", "none"}
+        if neutralized or portfolio_view.signal in {"VIEW_ONLY", "NO_ACTION"}:
+            actionability = "research-only"
+        elif portfolio_view.signal == "NEUTRAL" or degraded:
+            actionability = "cautious-tactical"
+        else:
+            actionability = "directional-tactical"
+
+        tactical_state = {
+            "engine_layer": "Layer 1: Evidence/State Engine",
+            "packet_kind": "tactical-view-packet",
+            "actionability": actionability,
+            "state_summary": {
+                "web": str(web_view.get("summary") or "N/A"),
+                "market": str(market_view.get("summary") or "N/A"),
+                "macro": str(macro_view.get("summary") or "N/A"),
+            },
+            "stance_summary": {
+                "signal": portfolio_view.signal,
+                "conviction": round(float(portfolio_view.conviction), 2),
+                "horizon": portfolio_view.horizon,
+            },
+            "source_trace": {
+                "evidence_count": len(evidence),
+                "live_web_items": int(web_view.get("live_evidence_count", 0) or 0),
+                "fallback_web_items": int(web_view.get("fallback_count", 0) or 0),
+                "market_ticker_count": len(market_snapshot.tickers),
+                "macro_indicator_count": len(macro_state.indicators),
+            },
+            "state_modes": {
+                "web": web_mode,
+                "market": market_mode,
+                "macro": macro_mode,
+            },
+        }
 
         packet = ResearchPacket(
             run_id=uuid4().hex[:12],
@@ -109,8 +143,15 @@ class ResearchOrchestrator:
             macro_view=macro_view,
             history=history,
             portfolio_view=portfolio_view,
+            tactical_state=tactical_state,
+            layer="layer1-evidence-state",
+            packet_kind="tactical-view-packet",
+            actionability=actionability,
             report="",
             metadata={
+                "engine_layer": "Layer 1: Evidence/State Engine",
+                "packet_kind": "tactical-view-packet",
+                "actionability": actionability,
                 "transport": "mcp-native",
                 "capabilities": ["web", "macro", "local-market"],
                 "degraded": degraded,

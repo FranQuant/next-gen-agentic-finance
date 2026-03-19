@@ -16,9 +16,13 @@ class Example10Config:
     default_tickers: tuple[str, ...] = ("SPY", "QQQ", "TLT")
     default_macro_indicators: tuple[str, ...] = (
         "inflation",
+        "core_inflation",
         "unemployment",
+        "payrolls",
         "policy_rate",
         "10y_yield",
+        "curve_slope",
+        "credit_spread",
     )
     mcp_server_url: str | None = None
     mcp_timeout_sec: int = 8

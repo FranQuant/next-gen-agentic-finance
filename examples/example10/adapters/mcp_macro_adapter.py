@@ -143,11 +143,46 @@ class _MCPClient:
 
 
 class MCPMacroAdapter:
+    DEFAULT_PANEL = (
+        "inflation",
+        "core_inflation",
+        "unemployment",
+        "payrolls",
+        "policy_rate",
+        "10y_yield",
+        "curve_slope",
+        "credit_spread",
+    )
+    INDICATOR_ALIASES = {
+        "headline_inflation": "inflation",
+        "headline inflation": "inflation",
+        "cpi": "inflation",
+        "cpiaucsl": "inflation",
+        "core_cpi": "core_inflation",
+        "core inflation": "core_inflation",
+        "cpilfesl": "core_inflation",
+        "unrate": "unemployment",
+        "payems": "payrolls",
+        "fedfunds": "policy_rate",
+        "10y yield": "10y_yield",
+        "dgs10": "10y_yield",
+        "curve": "curve_slope",
+        "curve slope": "curve_slope",
+        "t10y2y": "curve_slope",
+        "hy spread": "credit_spread",
+        "high_yield_spread": "credit_spread",
+        "high yield spread": "credit_spread",
+        "bamlh0a0hym2": "credit_spread",
+    }
     FALLBACK_VALUES = {
         "inflation": 2.8,
+        "core_inflation": 3.1,
         "unemployment": 4.1,
-        "policy_rate": 3.6,
+        "payrolls": 1.4,
+        "policy_rate": 4.25,
         "10y_yield": 4.1,
+        "curve_slope": -0.25,
+        "credit_spread": 3.7,
         "gdp_growth": 2.0,
     }
 
@@ -232,11 +267,12 @@ class MCPMacroAdapter:
         raw_values = payload.get("indicators")
         if not isinstance(raw_values, dict):
             raw_values = {indicator: payload.get(indicator) for indicator in indicators if indicator in payload}
+        normalized_values = self._normalize_indicator_dict(raw_values)
 
         values: dict[str, float] = {}
         missing: list[str] = []
         for indicator in indicators:
-            numeric_value = self._coerce_indicator_value(raw_values.get(indicator))
+            numeric_value = self._coerce_indicator_value(normalized_values.get(indicator))
             if numeric_value is None:
                 fallback = self.FALLBACK_VALUES.get(indicator)
                 if fallback is None:
@@ -253,6 +289,8 @@ class MCPMacroAdapter:
         regime = str(payload.get("regime") or self._classify_regime(values))
         notes = self._normalize_notes(payload.get("notes"))
         notes = self._ensure_source_note(notes, str(payload.get("source") or "mcp-live"))
+        live_count = len(indicators) - len(missing)
+        notes.append(f"macro completeness: {live_count}/{len(indicators)} requested indicators sourced live.")
         if missing:
             notes.append(f"missing indicators filled with fallback: {', '.join(missing)}")
 
@@ -395,7 +433,8 @@ class MCPMacroAdapter:
         notes = [
             "source: mcp-fallback",
             "MCP macro adapter fallback values used.",
-            "Inflation assumed to be CPI YoY percent.",
+            "macro completeness: 0/{count} requested indicators sourced live.".format(count=len(indicators)),
+            "inflation/core_inflation/payrolls are normalized as year-over-year percent changes.",
         ]
         return MacroState(
             as_of=self._now_iso(),
@@ -405,13 +444,13 @@ class MCPMacroAdapter:
         )
 
     def _normalize_indicators(self, indicators: list[str]) -> list[str]:
-        requested = indicators or ["inflation", "unemployment", "policy_rate"]
+        requested = indicators or list(self.DEFAULT_PANEL)
         deduped: list[str] = []
         for indicator in requested:
-            normalized = self._clean_text(indicator).lower()
+            normalized = self._normalize_indicator_name(indicator)
             if normalized and normalized not in deduped:
                 deduped.append(normalized)
-        return deduped or ["inflation", "unemployment", "policy_rate"]
+        return deduped or list(self.DEFAULT_PANEL)
 
     def _normalize_notes(self, notes: Any) -> list[str]:
         if not isinstance(notes, list):
@@ -459,16 +498,43 @@ class MCPMacroAdapter:
 
     def _classify_regime(self, values: dict[str, float]) -> str:
         inflation = values.get("inflation", 2.8)
+        core_inflation = values.get("core_inflation", inflation)
         unemployment = values.get("unemployment", 4.1)
+        payrolls = values.get("payrolls", 1.5)
         policy_rate = values.get("policy_rate", 4.5)
+        curve_slope = values.get("curve_slope", -0.2)
+        credit_spread = values.get("credit_spread", 3.6)
 
-        if unemployment >= 5.5:
+        if (unemployment >= 5.0 and payrolls <= 0.5) or (curve_slope <= -0.5 and credit_spread >= 5.0):
             return "recession risk"
-        if inflation >= 3.0 and policy_rate >= 4.0:
+        if inflation >= 2.8 and core_inflation >= 3.0 and policy_rate >= 4.0:
             return "late-cycle tightening"
-        if inflation <= 2.3 and policy_rate <= 3.5 and unemployment <= 4.8:
-            return "easing expansion"
+        if (
+            inflation <= 2.5
+            and core_inflation <= 2.9
+            and unemployment <= 4.6
+            and payrolls >= 1.0
+            and curve_slope > 0.0
+            and credit_spread < 4.0
+        ):
+            return "disinflationary expansion"
         return "mid-cycle mixed"
+
+    def _normalize_indicator_name(self, indicator: Any) -> str:
+        normalized = self._clean_text(indicator).lower()
+        if normalized in self.FALLBACK_VALUES:
+            return normalized
+        return self.INDICATOR_ALIASES.get(normalized, normalized)
+
+    def _normalize_indicator_dict(self, raw_values: Any) -> dict[str, Any]:
+        if not isinstance(raw_values, dict):
+            return {}
+        normalized: dict[str, Any] = {}
+        for key, value in raw_values.items():
+            normalized_key = self._normalize_indicator_name(key)
+            if normalized_key and normalized_key not in normalized:
+                normalized[normalized_key] = value
+        return normalized
 
     def _clean_text(self, value: Any) -> str:
         if value is None:

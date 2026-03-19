@@ -77,6 +77,10 @@ class ResearchPacket:
     macro_view: dict[str, Any]
     history: list[RunRecord]
     portfolio_view: PortfolioView
+    tactical_state: dict[str, Any] = field(default_factory=dict)
+    layer: str = "layer1-evidence-state"
+    packet_kind: str = "tactical-view-packet"
+    actionability: str = "tactical"
     report: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 

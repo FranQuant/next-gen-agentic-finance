@@ -8,8 +8,8 @@ except ImportError:  # pragma: no cover
 
 class ReportFormatter:
     def format(self, packet: ResearchPacket) -> str:
-        brief_summary_lines = [
-            "RESEARCH BRIEF",
+        header_lines = [
+            "LAYER 1 TACTICAL VIEW PACKET",
             f"- Query: {packet.brief.query}",
             f"- Objective: {packet.brief.objective}",
             f"- Universe: {', '.join(packet.brief.tickers) if packet.brief.tickers else 'N/A'}",
@@ -18,62 +18,40 @@ class ReportFormatter:
                 "- Macro Lens: "
                 f"{', '.join(packet.brief.macro_indicators) if packet.brief.macro_indicators else 'N/A'}"
             ),
-            "- Capability Layer: MCP web + MCP macro + local market snapshot",
+            f"- Packet Kind: {packet.packet_kind}",
+            f"- Actionability: {packet.actionability}",
+            "- Role: reusable evidence/state handoff for downstream tactical allocation review.",
         ]
 
         stance_line = self._stance_delta_line(packet)
         if stance_line:
-            brief_summary_lines.append(stance_line)
+            header_lines.append(stance_line)
 
         status_lines = self._status_lines(packet)
+        source_trace_lines = self._source_trace_lines(packet)
+        state_lines = self._state_snapshot_lines(packet)
+        stance_lines = self._tactical_stance_lines(packet)
 
-        evidence_lines = [f"- {item.title} [{item.source}]" for item in packet.evidence[:5]]
-        if not evidence_lines:
-            evidence_lines = ["- No external evidence available."]
-
-        interpretation_lines = [
-            f"- Web: {packet.web_view.get('summary', 'N/A')}",
-            f"- Market: {packet.market_view.get('summary', 'N/A')}",
-            f"- Macro: {packet.macro_view.get('summary', 'N/A')}",
-        ]
-        indicator_snapshot = packet.macro_view.get("indicator_snapshot", {})
-        if isinstance(indicator_snapshot, dict) and indicator_snapshot:
-            indicator_text = ", ".join(
-                f"{name}={value:.2f}%"
-                for name, value in indicator_snapshot.items()
-                if isinstance(value, (int, float))
-            )
-            if indicator_text:
-                interpretation_lines.append(f"- Macro Indicators: {indicator_text}")
-
-        allocation_parts = [f"{ticker}:{weight:.2f}" for ticker, weight in packet.portfolio_view.allocations.items()]
-        portfolio_lines = [
-            f"- Signal: {packet.portfolio_view.signal}",
-            f"- Conviction: {packet.portfolio_view.conviction:.2f}",
-            f"- Horizon: {packet.portfolio_view.horizon}",
-            f"- Allocations: {', '.join(allocation_parts)}",
-        ]
-
-        risk_lines = [f"- {risk}" for risk in packet.portfolio_view.risks[:5]]
+        risk_lines = [f"- {risk}" for risk in packet.portfolio_view.risks[:4]]
         if not risk_lines:
             risk_lines = ["- No explicit risks were produced."]
 
         sections = [
-            *brief_summary_lines,
+            *header_lines,
             "",
             "RUN STATUS",
             *status_lines,
             "",
-            "EVIDENCE",
-            *evidence_lines,
+            "SOURCE TRACE",
+            *source_trace_lines,
             "",
-            "INTERPRETATION",
-            *interpretation_lines,
+            "TACTICAL STATE",
+            *state_lines,
             "",
-            "PORTFOLIO IMPLICATION",
-            *portfolio_lines,
+            "TACTICAL STANCE",
+            *stance_lines,
             "",
-            "RISKS",
+            "HANDOFF RISKS",
             *risk_lines,
         ]
 
@@ -91,7 +69,8 @@ class ReportFormatter:
 
     def _status_lines(self, packet: ResearchPacket) -> list[str]:
         metadata = packet.metadata or {}
-        web_mode = str(metadata.get("web_mode") or packet.web_view.get("evidence_mode") or "unknown")
+        web_view = getattr(packet, "web_view", {}) or {}
+        web_mode = str(metadata.get("web_mode") or web_view.get("evidence_mode") or "unknown")
         market_mode = str(metadata.get("market_mode") or "unknown")
         macro_mode = str(metadata.get("macro_mode") or "unknown")
         degraded = bool(metadata.get("degraded"))
@@ -131,4 +110,80 @@ class ReportFormatter:
         if neutralized:
             lines.append("- Actionability: signal held neutral until live sourced web evidence is available.")
 
+        return lines
+
+    def _source_trace_lines(self, packet: ResearchPacket) -> list[str]:
+        tactical_state = packet.tactical_state or {}
+        source_trace = tactical_state.get("source_trace", {}) if isinstance(tactical_state, dict) else {}
+        lines = [
+            (
+                "- Coverage: "
+                f"evidence={source_trace.get('evidence_count', len(packet.evidence))}, "
+                f"live_web={source_trace.get('live_web_items', packet.web_view.get('live_evidence_count', 0))}, "
+                f"macro_indicators={source_trace.get('macro_indicator_count', len(packet.macro_state.indicators))}, "
+                f"market_tickers={source_trace.get('market_ticker_count', len(packet.market_snapshot.tickers))}"
+            )
+        ]
+
+        unique_sources = []
+        for item in packet.evidence:
+            source = item.source.strip()
+            if source and source not in unique_sources:
+                unique_sources.append(source)
+        if unique_sources:
+            lines.append(f"- Source Mix: {', '.join(unique_sources[:4])}")
+
+        trace_items = packet.evidence[:4]
+        if trace_items:
+            lines.extend(f"- {item.title} [{item.source}]" for item in trace_items)
+        else:
+            lines.append("- No external evidence available.")
+
+        return lines
+
+    def _state_snapshot_lines(self, packet: ResearchPacket) -> list[str]:
+        lines = [
+            f"- Web State: {packet.web_view.get('summary', 'N/A')}",
+            f"- Market State: {packet.market_view.get('summary', 'N/A')}",
+            f"- Macro State: {packet.macro_view.get('summary', 'N/A')}",
+        ]
+
+        key_points = packet.web_view.get("key_points", [])
+        if isinstance(key_points, list) and key_points:
+            lines.append(f"- Web Key Points: {' | '.join(str(point) for point in key_points[:2])}")
+
+        indicator_snapshot = packet.macro_view.get("indicator_snapshot", {})
+        if isinstance(indicator_snapshot, dict) and indicator_snapshot:
+            ordered_keys = (
+                "headline_inflation_yoy_pct",
+                "core_inflation_yoy_pct",
+                "unemployment_pct",
+                "payrolls_yoy_pct",
+                "policy_rate_pct",
+                "curve_slope_pct",
+                "credit_spread_pct",
+            )
+            parts = []
+            for name in ordered_keys:
+                value = indicator_snapshot.get(name)
+                if isinstance(value, (int, float)):
+                    parts.append(f"{name}={value:.2f}")
+            if parts:
+                lines.append(f"- Macro Snapshot: {', '.join(parts)}")
+
+        return lines
+
+    def _tactical_stance_lines(self, packet: ResearchPacket) -> list[str]:
+        allocation_parts = [f"{ticker}:{weight:.2f}" for ticker, weight in packet.portfolio_view.allocations.items()]
+        lines = [
+            f"- Signal: {packet.portfolio_view.signal}",
+            f"- Conviction: {packet.portfolio_view.conviction:.2f}",
+            f"- Horizon: {packet.portfolio_view.horizon}",
+            f"- Actionability: {packet.actionability}",
+            f"- Allocations: {', '.join(allocation_parts) if allocation_parts else 'N/A'}",
+            "- Handoff Use: tactical state packet for downstream allocator or PM review, not final portfolio construction.",
+        ]
+        thesis = packet.portfolio_view.thesis[:2]
+        if thesis:
+            lines.append(f"- Stance Basis: {' | '.join(thesis)}")
         return lines
