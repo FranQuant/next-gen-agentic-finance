@@ -214,6 +214,42 @@ class MCPWebAdapter:
         "rank",
         "position",
     )
+    TIMESTAMP_KEYS = (
+        "published_at",
+        "publishedAt",
+        "published_date",
+        "publishedDate",
+        "date",
+        "datetime",
+        "time",
+        "timestamp",
+        "created_at",
+        "updated_at",
+    )
+    TACTICAL_RECENT_TOKENS = (
+        "latest",
+        "current",
+        "today",
+        "near-term",
+        "near term",
+        "weekly",
+        "market commentary",
+        "weekly commentary",
+        "market update",
+        "tactical note",
+        "market note",
+    )
+    BACKGROUND_OUTLOOK_TOKENS = (
+        "investment outlook",
+        "market outlook",
+        "equity market outlook",
+        "strategy outlook",
+        "annual outlook",
+        "quarterly outlook",
+        "factor views",
+        "year ahead",
+        "year-ahead",
+    )
     PREFERRED_SOURCES = (
         "reuters.com",
         "bloomberg.com",
@@ -302,30 +338,55 @@ class MCPWebAdapter:
             return []
 
         self.last_search_report = self._empty_search_report(topics)
+        tactical = any(self._is_tactical_topic(topic) for topic in topics)
+        self.last_search_report["freshness_bias"] = "tactical" if tactical else "standard"
         evidence: list[Evidence] = []
         for topic in topics:
-            evidence.extend(self._search_topic(topic))
+            evidence.extend(self._search_topic(topic, tactical=tactical))
 
         if not evidence:
             return self._fallback(topics, "MCP web search unavailable; placeholder evidence used.")
 
-        return self._diversify(evidence, limit=len(topics) * self.max_results_per_topic)
+        return self._diversify(evidence, limit=len(topics) * self.max_results_per_topic, tactical=tactical)
 
-    def _build_queries(self, topic: str) -> list[str]:
+    def _build_queries(self, topic: str, tactical: bool = False) -> list[str]:
         focus = self._topic_focus(topic)
         if self._looks_like_asset_topic(topic, focus):
-            variants = [
-                f"{focus} institutional outlook",
-                f"{focus} macro outlook",
-                f"{focus} investment outlook",
-                f"{focus} strategy outlook",
-            ]
+            variants = []
+            if tactical:
+                variants.extend(
+                    [
+                        f"{focus} weekly market commentary",
+                        f"{focus} latest tactical note",
+                        f"{focus} tactical outlook",
+                        f"{focus} latest market update",
+                        f"{focus} current market note",
+                    ]
+                )
+            variants.extend(
+                [
+                    f"{focus} institutional outlook",
+                    f"{focus} macro outlook",
+                    f"{focus} investment outlook",
+                    f"{focus} strategy outlook",
+                ]
+            )
         else:
-            variants = [
-                f"{focus} institutional market outlook",
-                f"{focus} macro outlook",
-                f"{focus} investment strategy outlook",
-            ]
+            variants = []
+            if tactical:
+                variants.extend(
+                    [
+                        f"{focus} latest institutional outlook",
+                        f"{focus} current market update",
+                    ]
+                )
+            variants.extend(
+                [
+                    f"{focus} institutional market outlook",
+                    f"{focus} macro outlook",
+                    f"{focus} investment strategy outlook",
+                ]
+            )
 
         queries: list[str] = []
         for query in variants:
@@ -334,9 +395,9 @@ class MCPWebAdapter:
                 queries.append(cleaned)
         return queries or [self._clean_text(topic)]
 
-    def _build_search_payloads(self, topic: str) -> list[dict[str, Any]]:
+    def _build_search_payloads(self, topic: str, tactical: bool = False) -> list[dict[str, Any]]:
         payloads: list[dict[str, Any]] = []
-        for query in self._build_queries(topic):
+        for query in self._build_queries(topic, tactical=tactical):
             payloads.append(
                 {
                     "query": query,
@@ -360,8 +421,8 @@ class MCPWebAdapter:
             payloads.append({"query": query})
         return payloads
 
-    def _search_topic(self, topic: str) -> list[Evidence]:
-        payloads = self._build_search_payloads(topic)
+    def _search_topic(self, topic: str, tactical: bool = False) -> list[Evidence]:
+        payloads = self._build_search_payloads(topic, tactical=tactical)
 
         for payload in payloads:
             query = self._clean_text(payload.get("query") or topic)
@@ -381,7 +442,7 @@ class MCPWebAdapter:
                     continue
 
                 self.last_search_report["live_mcp_used"] = True
-                records, trace = self._normalize_live_records(response=response, topic=topic)
+                records, trace = self._normalize_live_records(response=response, topic=topic, tactical=tactical)
                 needs_extract = bool(records) and self._needs_extract_enrichment(records)
                 self._append_report_entry(
                     "search_calls",
@@ -402,7 +463,7 @@ class MCPWebAdapter:
                 if self.enable_extract_enrichment and needs_extract:
                     records = self._apply_extract_enrichment(records, topic=topic)
 
-                parsed = self._records_to_evidence(records=records, live=True)
+                parsed = self._records_to_evidence(records=records, live=True, tactical=tactical)
                 if parsed:
                     return parsed[: self.max_results_per_topic]
             except Exception as exc:
@@ -424,6 +485,7 @@ class MCPWebAdapter:
         self,
         response: dict[str, Any],
         topic: str,
+        tactical: bool = False,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         response_answer = self._extract_response_answer(response)
         raw_results = self._extract_raw_results(response=response, topic=topic)
@@ -458,7 +520,7 @@ class MCPWebAdapter:
 
         records = self._prune_low_quality_records(records)
         return (
-            sorted(records, key=self._record_rank, reverse=True),
+            sorted(records, key=lambda item: self._record_rank(item, tactical=tactical), reverse=True),
             {
                 "parsed_outputs": sorted(origins),
                 "raw_results": len(raw_results),
@@ -745,7 +807,7 @@ class MCPWebAdapter:
 
         return mapping, {"parsed_outputs": sorted(origins), "raw_results": len(raw_items)}
 
-    def _records_to_evidence(self, records: list[dict[str, Any]], live: bool) -> list[Evidence]:
+    def _records_to_evidence(self, records: list[dict[str, Any]], live: bool, tactical: bool = False) -> list[Evidence]:
         prefix = "mcp-live" if live else "mcp-fallback"
         evidence: list[Evidence] = []
 
@@ -755,6 +817,7 @@ class MCPWebAdapter:
             url = self._clean_text(item.get("url") or "")
             snippet = self._clean_text(item.get("snippet") or "")
             relevance = self._coerce_score(item.get("relevance"))
+            timestamp = self._clean_text(item.get("timestamp") or "")
 
             evidence.append(
                 Evidence(
@@ -762,12 +825,12 @@ class MCPWebAdapter:
                     title=title,
                     summary=snippet[:280],
                     url=url,
-                    timestamp=self._now_iso(),
+                    timestamp=timestamp,
                     relevance=relevance,
                 )
             )
 
-        return sorted(evidence, key=self._rank_evidence, reverse=True)
+        return sorted(evidence, key=lambda item: self._rank_evidence(item, tactical=tactical), reverse=True)
 
     def _normalize_result_item(
         self,
@@ -796,19 +859,29 @@ class MCPWebAdapter:
             "snippet": self._clean_text(snippet),
             "domain": domain or "web",
             "relevance": self._extract_relevance(item),
+            "timestamp": self._extract_timestamp(item),
             "_origin": self._clean_text(item.get("_origin")),
         }
 
-    def _rank_evidence(self, item: Evidence) -> float:
+    def _rank_evidence(self, item: Evidence, tactical: bool = False) -> float:
         source_name = self._source_name(item.source)
         source_boost = self._source_quality_boost(source_name)
         content_boost = min(len(item.summary) / 420.0, 0.3)
-        return item.relevance + source_boost + content_boost
+        freshness_boost = self._freshness_boost(item.timestamp, tactical=tactical)
+        tactical_bias = self._tactical_document_bias(
+            title=item.title,
+            snippet=item.summary,
+            timestamp=item.timestamp,
+            tactical=tactical,
+        )
+        return item.relevance + source_boost + content_boost + freshness_boost + tactical_bias
 
-    def _diversify(self, evidence: list[Evidence], limit: int) -> list[Evidence]:
-        ranked = sorted(evidence, key=self._rank_evidence, reverse=True)
+    def _diversify(self, evidence: list[Evidence], limit: int, tactical: bool = False) -> list[Evidence]:
+        ranked = sorted(evidence, key=lambda item: self._rank_evidence(item, tactical=tactical), reverse=True)
         selected: list[Evidence] = []
         counts: dict[str, int] = {}
+        background_counts: dict[str, int] = {}
+        title_families: set[str] = set()
         cap_per_source = 2
 
         for item in ranked:
@@ -817,8 +890,18 @@ class MCPWebAdapter:
             key = item.source
             if counts.get(key, 0) >= cap_per_source:
                 continue
+            family_key = self._title_family_key(item.title)
+            if family_key and family_key in title_families:
+                continue
+            if tactical and self._is_background_outlook_item(item.title, item.summary):
+                if background_counts.get(key, 0) >= 1:
+                    continue
             selected.append(item)
             counts[key] = counts.get(key, 0) + 1
+            if family_key:
+                title_families.add(family_key)
+            if tactical and self._is_background_outlook_item(item.title, item.summary):
+                background_counts[key] = background_counts.get(key, 0) + 1
 
         if len(selected) < min(limit, len(ranked)):
             for item in ranked:
@@ -826,7 +909,24 @@ class MCPWebAdapter:
                     break
                 if item in selected:
                     continue
+                key = item.source
+                if counts.get(key, 0) >= cap_per_source:
+                    continue
+                family_key = self._title_family_key(item.title)
+                if family_key and family_key in title_families:
+                    continue
+                if tactical and self._is_background_outlook_item(item.title, item.summary):
+                    if background_counts.get(key, 0) >= 1:
+                        continue
                 selected.append(item)
+                counts[key] = counts.get(key, 0) + 1
+                if family_key:
+                    title_families.add(family_key)
+                if tactical and self._is_background_outlook_item(item.title, item.summary):
+                    background_counts[key] = background_counts.get(key, 0) + 1
+
+        if tactical:
+            selected = self._rebalance_tactical_slice(selected)
 
         return selected
 
@@ -1101,14 +1201,21 @@ class MCPWebAdapter:
 
         return self._pick_first_text(response, ("answer", "response"))
 
-    def _record_rank(self, item: dict[str, Any]) -> float:
+    def _record_rank(self, item: dict[str, Any], tactical: bool = False) -> float:
         domain = self._canonical_domain(str(item.get("domain") or "web").lower())
         source_boost = self._source_quality_boost(domain)
         snippet = self._clean_text(item.get("snippet") or "")
         content_boost = min(len(snippet) / 420.0, 0.3)
         relevance = self._coerce_score(item.get("relevance"))
         enriched_boost = 0.05 if item.get("extract_enriched") else 0.0
-        return relevance + source_boost + content_boost + enriched_boost
+        freshness_boost = self._freshness_boost(str(item.get("timestamp") or ""), tactical=tactical)
+        tactical_bias = self._tactical_document_bias(
+            title=self._clean_text(item.get("title") or ""),
+            snippet=snippet,
+            timestamp=str(item.get("timestamp") or ""),
+            tactical=tactical,
+        )
+        return relevance + source_boost + content_boost + enriched_boost + freshness_boost + tactical_bias
 
     def _pick_extract_urls(self, records: list[dict[str, Any]], topic: str) -> list[str]:
         ranked = sorted(records, key=self._record_rank, reverse=True)
@@ -1161,6 +1268,231 @@ class MCPWebAdapter:
         except Exception:
             return None
 
+    def _extract_timestamp(self, item: dict[str, Any]) -> str:
+        for key in self.TIMESTAMP_KEYS:
+            if key not in item:
+                continue
+            parsed = self._parse_datetime(item.get(key))
+            if parsed is not None:
+                return parsed.isoformat()
+
+        resource = item.get("resource")
+        if isinstance(resource, dict):
+            for key in self.TIMESTAMP_KEYS:
+                if key not in resource:
+                    continue
+                parsed = self._parse_datetime(resource.get(key))
+                if parsed is not None:
+                    return parsed.isoformat()
+
+        for text in (
+            self._pick_first_text(item, self.TITLE_KEYS),
+            self._pick_first_text(item, self.SEARCH_SNIPPET_KEYS),
+        ):
+            parsed = self._extract_timestamp_from_text(text)
+            if parsed is not None:
+                return parsed.isoformat()
+
+        return ""
+
+    def _parse_datetime(self, value: Any) -> datetime | None:
+        text = self._clean_text(value)
+        if not text:
+            return None
+
+        iso_candidate = text.replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(iso_candidate)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
+        except ValueError:
+            pass
+
+        for fmt in (
+            "%Y-%m-%d",
+            "%Y/%m/%d",
+            "%b %d, %Y",
+            "%B %d, %Y",
+            "%a, %d %b %Y %H:%M:%S %Z",
+            "%a, %d %b %Y %H:%M:%S %z",
+        ):
+            try:
+                parsed = datetime.strptime(text, fmt)
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                return parsed.astimezone(timezone.utc)
+            except ValueError:
+                continue
+
+        return None
+
+    def _extract_timestamp_from_text(self, text: str) -> datetime | None:
+        normalized = self._clean_text(text)
+        if not normalized:
+            return None
+
+        for pattern in (
+            r"\b\d{4}-\d{2}-\d{2}\b",
+            r"\b\d{1,2}/\d{1,2}/\d{4}\b",
+            r"\b(?:Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)\s+\d{1,2},\s+\d{4}\b",
+        ):
+            match = re.search(pattern, normalized, flags=re.IGNORECASE)
+            if not match:
+                continue
+            parsed = self._parse_datetime(match.group(0))
+            if parsed is not None:
+                return parsed
+
+        return None
+
+    def _freshness_boost(self, timestamp: str, tactical: bool = False) -> float:
+        parsed = self._parse_datetime(timestamp)
+        if parsed is None:
+            return 0.0
+
+        age_days = max(0.0, (self._now() - parsed).total_seconds() / 86400.0)
+        if tactical:
+            if age_days <= 14:
+                return 0.22
+            if age_days <= 45:
+                return 0.12
+            if age_days <= 120:
+                return 0.04
+            if age_days <= 240:
+                return -0.05
+            return -0.12
+
+        if age_days <= 45:
+            return 0.04
+        if age_days <= 180:
+            return 0.0
+        return -0.03
+
+    def _tactical_document_bias(
+        self,
+        title: str,
+        snippet: str,
+        timestamp: str,
+        tactical: bool = False,
+    ) -> float:
+        if not tactical:
+            return 0.0
+
+        combined = f"{title} {snippet}".lower()
+        bias = 0.0
+        if any(token in combined for token in self.TACTICAL_RECENT_TOKENS):
+            bias += 0.08
+        if any(token in combined for token in self.BACKGROUND_OUTLOOK_TOKENS):
+            bias -= 0.10
+            if self._freshness_boost(timestamp, tactical=True) <= 0.04:
+                bias -= 0.04
+        return bias
+
+    def _is_background_outlook_item(self, title: str, snippet: str) -> bool:
+        combined = f"{title} {snippet}".lower()
+        if any(token in combined for token in self.BACKGROUND_OUTLOOK_TOKENS):
+            return True
+        if re.search(r"\b(?:19|20)\d{2}\s+outlooks?\b", combined):
+            return True
+        return "investment directions" in combined and "outlook" in combined
+
+    def _title_family_key(self, title: str) -> str:
+        generic_tokens = {
+            "the",
+            "a",
+            "an",
+            "and",
+            "for",
+            "to",
+            "of",
+            "in",
+            "on",
+            "with",
+            "market",
+            "markets",
+            "outlook",
+            "outlooks",
+            "weekly",
+            "update",
+            "commentary",
+            "insights",
+        }
+        normalized = re.sub(r"[^a-z0-9\s]", " ", title.lower())
+        tokens = [token for token in normalized.split() if token and token not in generic_tokens]
+        if not tokens:
+            return ""
+        return " ".join(tokens[:4])
+
+    def _is_tactical_priority_evidence(self, item: Evidence) -> bool:
+        combined = f"{item.title} {item.summary}".lower()
+        return (
+            self._freshness_boost(item.timestamp, tactical=True) >= 0.12
+            or any(token in combined for token in self.TACTICAL_RECENT_TOKENS)
+        )
+
+    def _rebalance_tactical_slice(self, evidence: list[Evidence]) -> list[Evidence]:
+        if len(evidence) < 2:
+            return evidence
+
+        priority: list[Evidence] = []
+        background: list[Evidence] = []
+        for item in evidence:
+            if self._is_background_outlook_item(item.title, item.summary) and not self._is_tactical_priority_evidence(item):
+                background.append(item)
+            else:
+                priority.append(item)
+
+        if not priority:
+            return self._interleave_evidence_by_source(evidence)
+
+        return self._interleave_evidence_by_source(priority) + background
+
+    def _interleave_evidence_by_source(self, evidence: list[Evidence]) -> list[Evidence]:
+        if len(evidence) < 2:
+            return evidence
+
+        buckets: dict[str, list[Evidence]] = {}
+        source_order: list[str] = []
+        for item in evidence:
+            key = item.source
+            if key not in buckets:
+                buckets[key] = []
+                source_order.append(key)
+            buckets[key].append(item)
+
+        interleaved: list[Evidence] = []
+        active_sources = list(source_order)
+        while active_sources:
+            next_sources: list[str] = []
+            for source in active_sources:
+                bucket = buckets.get(source, [])
+                if not bucket:
+                    continue
+                interleaved.append(bucket.pop(0))
+                if bucket:
+                    next_sources.append(source)
+            active_sources = next_sources
+
+        return interleaved
+
+    def _is_tactical_topic(self, topic: str) -> bool:
+        normalized = self._clean_text(topic).lower()
+        tactical_terms = (
+            "tactical",
+            "current",
+            "now",
+            "latest",
+            "today",
+            "near-term",
+            "near term",
+            "overweight",
+            "underweight",
+            "current macro",
+            "current market",
+        )
+        return any(term in normalized for term in tactical_terms)
+
     def _clean_text(self, value: Any) -> str:
         if value is None:
             return ""
@@ -1189,3 +1521,6 @@ class MCPWebAdapter:
 
     def _now_iso(self) -> str:
         return datetime.now(timezone.utc).isoformat()
+
+    def _now(self) -> datetime:
+        return datetime.now(timezone.utc)

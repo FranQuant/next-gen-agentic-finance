@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 try:
@@ -44,6 +45,46 @@ _OUTLOOK_STYLE_TOKENS = (
     "update",
 )
 
+_BACKGROUND_OUTLOOK_TOKENS = (
+    "investment outlook",
+    "market outlook",
+    "equity market outlook",
+    "strategy outlook",
+    "annual outlook",
+    "quarterly outlook",
+    "factor views",
+    "year ahead",
+    "year-ahead",
+)
+
+_TACTICAL_RECENT_TOKENS = (
+    "latest",
+    "current",
+    "today",
+    "near-term",
+    "near term",
+    "weekly",
+    "market commentary",
+    "weekly commentary",
+    "market update",
+    "tactical note",
+    "market note",
+)
+
+_TACTICAL_QUERY_TOKENS = (
+    "tactical",
+    "current",
+    "now",
+    "latest",
+    "today",
+    "near-term",
+    "near term",
+    "overweight",
+    "underweight",
+    "current macro",
+    "current market",
+)
+
 
 class WebIntelligenceAgent:
     def analyze(self, brief: ResearchBrief, evidence: list[Evidence]) -> dict:
@@ -80,7 +121,8 @@ class WebIntelligenceAgent:
                 "live_evidence_count": 0,
             }
 
-        diversified_live_evidence = self._diversify_live_evidence(live_evidence)
+        tactical_brief = self._is_tactical_brief(brief)
+        diversified_live_evidence = self._diversify_live_evidence(live_evidence, tactical=tactical_brief)
         if not diversified_live_evidence:
             diversified_live_evidence = live_evidence[:3]
 
@@ -120,14 +162,23 @@ class WebIntelligenceAgent:
             risks.append(f"{fallback_count} fallback placeholder item(s) were ignored in web scoring.")
             confidence = min(confidence, 0.35)
 
+        recent_count = self._recent_item_count(diversified_live_evidence, max_age_days=45)
+        freshness_suffix = ""
+        if tactical_brief:
+            freshness_suffix = (
+                f"; freshness-aware tactical ranking favored {recent_count} recent item(s)"
+                if recent_count
+                else "; freshness-aware tactical ranking was applied"
+            )
+
         return {
             "summary": (
                 f"Web evidence across {len(diversified_live_evidence)} diversified live item(s) "
-                f"from {distinct_sources} source(s) is {sentiment}."
+                f"from {distinct_sources} source(s) is {sentiment}{freshness_suffix}."
                 if not fallback_count
                 else (
                     f"Web evidence across {len(diversified_live_evidence)} diversified live item(s) "
-                    f"from {distinct_sources} source(s) is {sentiment}; "
+                    f"from {distinct_sources} source(s) is {sentiment}{freshness_suffix}; "
                     f"{fallback_count} fallback placeholder item(s) were ignored."
                 )
             ),
@@ -156,11 +207,13 @@ class WebIntelligenceAgent:
             return "negative"
         return "mixed"
 
-    def _diversify_live_evidence(self, evidence: list[Evidence]) -> list[Evidence]:
-        ranked = sorted(
-            enumerate(evidence),
-            key=lambda pair: (-float(pair[1].relevance), pair[0]),
-        )
+    def _diversify_live_evidence(self, evidence: list[Evidence], tactical: bool = False) -> list[Evidence]:
+        ranked = list(enumerate(evidence))
+        if not tactical:
+            ranked = sorted(
+                ranked,
+                key=lambda pair: (-float(pair[1].relevance), pair[0]),
+            )
         selected: list[Evidence] = []
         source_counts: dict[str, int] = {}
         family_keys: set[str] = set()
@@ -180,6 +233,9 @@ class WebIntelligenceAgent:
             source_counts[source_key] = source_counts.get(source_key, 0) + 1
             if family_key:
                 family_keys.add(family_key)
+
+        if tactical:
+            selected = self._rebalance_tactical_slice(selected)
 
         return selected
 
@@ -206,6 +262,99 @@ class WebIntelligenceAgent:
     def _is_outlook_style_evidence(self, item: Evidence) -> bool:
         text = f"{item.title} {item.summary}".lower()
         return any(token in text for token in _OUTLOOK_STYLE_TOKENS)
+
+    def _is_tactical_brief(self, brief: ResearchBrief) -> bool:
+        normalized = " ".join(
+            [
+                brief.query,
+                brief.objective,
+                " ".join(brief.topics),
+                " ".join(brief.constraints),
+            ]
+        ).lower()
+        return any(token in normalized for token in _TACTICAL_QUERY_TOKENS)
+
+    def _recent_item_count(self, evidence: list[Evidence], max_age_days: int) -> int:
+        count = 0
+        for item in evidence:
+            parsed = self._parse_timestamp(item.timestamp)
+            if parsed is None:
+                continue
+            age_days = (datetime.now(timezone.utc) - parsed).total_seconds() / 86400.0
+            if age_days <= max_age_days:
+                count += 1
+        return count
+
+    def _parse_timestamp(self, value: str) -> datetime | None:
+        text = (value or "").strip()
+        if not text:
+            return None
+        try:
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    def _rebalance_tactical_slice(self, evidence: list[Evidence]) -> list[Evidence]:
+        if len(evidence) < 2:
+            return evidence
+
+        priority: list[Evidence] = []
+        background: list[Evidence] = []
+        for item in evidence:
+            if self._is_background_outlook_item(item) and not self._is_tactical_priority_item(item):
+                background.append(item)
+            else:
+                priority.append(item)
+
+        if not priority:
+            return self._interleave_by_source(evidence)
+
+        return self._interleave_by_source(priority) + background
+
+    def _interleave_by_source(self, evidence: list[Evidence]) -> list[Evidence]:
+        buckets: dict[str, list[Evidence]] = {}
+        source_order: list[str] = []
+        for item in evidence:
+            source_key = self._source_key(item)
+            if source_key not in buckets:
+                buckets[source_key] = []
+                source_order.append(source_key)
+            buckets[source_key].append(item)
+
+        interleaved: list[Evidence] = []
+        active_sources = list(source_order)
+        while active_sources:
+            next_sources: list[str] = []
+            for source in active_sources:
+                bucket = buckets.get(source, [])
+                if not bucket:
+                    continue
+                interleaved.append(bucket.pop(0))
+                if bucket:
+                    next_sources.append(source)
+            active_sources = next_sources
+
+        return interleaved
+
+    def _is_background_outlook_item(self, item: Evidence) -> bool:
+        text = f"{item.title} {item.summary}".lower()
+        if any(token in text for token in _BACKGROUND_OUTLOOK_TOKENS):
+            return True
+        if re.search(r"\b(?:19|20)\d{2}\s+outlooks?\b", text):
+            return True
+        return "investment directions" in text and "outlook" in text
+
+    def _is_tactical_priority_item(self, item: Evidence) -> bool:
+        text = f"{item.title} {item.summary}".lower()
+        parsed = self._parse_timestamp(item.timestamp)
+        if parsed is not None:
+            age_days = (datetime.now(timezone.utc) - parsed).total_seconds() / 86400.0
+            if age_days <= 45:
+                return True
+        return any(token in text for token in _TACTICAL_RECENT_TOKENS)
 
     def _normalized_title(self, text: str) -> str:
         normalized = re.sub(r"[^a-z0-9\s]", " ", (text or "").lower())
