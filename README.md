@@ -1,6 +1,6 @@
 # Agentic Finance Examples
 
-Agentic finance examples for tool-enabled research workflows, market and macro retrieval, multi-agent analysis, and MCP-native research orchestration.
+A focused learning repository for agentic finance patterns: prompt engineering, live retrieval, retrieval debugging, interactive analyst workflows, structured data access, custom finance tools, multi-agent research orchestration, and structured research handoff design.
 
 Built with:
 
@@ -8,7 +8,7 @@ Built with:
 - OpenAI Responses models
 - Tavily web search
 - yfinance market data
-- MCP-based web and macro integrations in `example10`
+- local CSV / SQL-style querying for structured data examples
 
 ## 1. Setup
 
@@ -22,7 +22,7 @@ source "$HOME/.local/bin/env"
 uv --version
 ```
 
-Clone the repository and create the environment:
+Create the environment and install dependencies:
 
 ```bash
 git clone https://github.com/FranQuant/next-gen-agentic-finance.git
@@ -33,13 +33,15 @@ source .venv/bin/activate
 uv sync
 ```
 
-Run the setup check:
+Run the installation sanity check:
 
 ```bash
-python examples/example0_setup_check.py
+uv run examples/example0_setup_check.py
 ```
 
 ## 2. Environment Variables
+
+Copy the template:
 
 ```bash
 cp .env.example .env
@@ -47,74 +49,72 @@ cp .env.example .env
 
 Set the keys needed for the examples you want to run:
 
-* `OPENAI_API_KEY` — OpenAI-powered examples
-* `TAVILY_API_KEY` — web search and news retrieval
-* `FRED_API_KEY` — optional macro data flows
+- `OPENAI_API_KEY` — required for OpenAI-powered examples
+- `TAVILY_API_KEY` — required for web search and live news retrieval examples
+- `FRED_API_KEY` — optional for future macro-oriented demos if added later
 
-See `.env.example` for the current template.
+See `.env.example` for the current template and optional per-example model overrides.
 
 ## 3. Example Guide
 
 | Example | Focus |
 |---|---|
-| `example0` | Setup check |
-| `example1` to `example4` | Single-agent and tool-usage foundations |
-| `example5` and `example6` | Finance-shaped tool demos |
-| `example7` to `example9` | Multi-agent finance workflows |
-| `example10` | MCP-native finance research capstone |
+| `example0_setup_check.py` | Minimal installation sanity check |
+| `example1.py` | Prompt-only baseline over static finance headlines |
+| `example2.py` | Tool-enabled live finance-news retrieval and sentiment scoring |
+| `example3.py` | Retrieval debug, traceability, and quality inspection |
+| `example4.py` | Interactive analyst console for ad hoc market-topic queries |
+| `example5.py` | Local CSV / SQL-style LatAm equities data agent |
+| `example6.py` | Custom finance tool example: options maximum pain |
+| `example7.py` | Clean multi-agent stock research orchestration |
+| `example8.py` | Compact structured research handoff |
 
-Progression:
+## 4. Progression
 
-- `example0` → setup check
-- `example1` to `example4` → foundations
-- `example5` and `example6` → finance-oriented demos
-- `example7` to `example9` → multi-agent workflows
-- `example10` → flagship capstone
+- `example0_setup_check.py` → environment sanity check
+- `example1.py` → prompt-only baseline
+- `example2.py` → first live retrieval workflow
+- `example3.py` → inspect and debug retrieval behavior
+- `example4.py` → turn retrieval into an interactive analyst workflow
+- `example5.py` → structured local data querying
+- `example6.py` → custom domain-specific finance tool
+- `example7.py` → first clean multi-agent research brief
+- `example8.py` → structured research handoff with explicit open questions and gaps
 
-## 4. Shared Utility Layer
+## 5. Shared Utility Layer
 
-`examples/finance_tools.py` provides a lightweight shared tool layer used across multiple examples for market data, company snapshots, and web/news retrieval.
+`examples/finance_tools.py` provides a lightweight shared tool layer used across multiple examples for market data, analyst context, company snapshots, and web/news retrieval.
 
-It is intended as a compact demo utility module, not a production SDK.
+It is a compact demo utility module, not a production SDK.
 
-## 5. Current Repository Structure
+## 6. Current Repository Structure
 
 ```text
 next-gen-agentic-finance/
 ├── data/
 ├── examples/
 │   ├── example0_setup_check.py
-│   ├── example1.py ... example9.py
-│   ├── finance_tools.py
-│   ├── example10/
-│   │   ├── example10.py
-│   │   ├── team.py
-│   │   ├── config.py
-│   │   ├── schemas.py
-│   │   ├── adapters/
-│   │   ├── agents/
-│   │   └── services/
+│   ├── example1.py
+│   ├── example2.py
+│   ├── example3.py
+│   ├── example4.py
+│   ├── example5.py
+│   ├── example6.py
+│   ├── example7.py
+│   ├── example8.py
+│   └── finance_tools.py
 ├── README.md
 ├── pyproject.toml
 └── uv.lock
 ```
 
-## Where to Start
+## 7. Where to Start
 
-- Run `example0_setup_check.py` to confirm the environment is working.
-- Start with `example1.py` to `example4.py` for foundations.
-- Use `example10` for the MCP-native finance research capstone.
-
-## Example10 Run Modes
-
-- On a typical fresh run, `example10` behaves in a local/degraded mode: it still works without live MCP services, but web and macro inputs may fall back and market data may use placeholders.
-- Set `EXAMPLE10_USE_MCP_LIVE=1` to explicitly enable live MCP mode.
-- Compatible `EXAMPLE10_MCP_*` settings and available credentials such as `TAVILY_API_KEY` and `FRED_API_KEY` may also cause live MCP mode to be inferred automatically after `.env` loading.
-- Set `EXAMPLE10_USE_MCP_LIVE=0` to force local/degraded mode even when compatible MCP settings or credentials are present.
-
-## Quick Preview
-
-![Example10 demo](docs/example10_demo.gif)
+- Run `example0_setup_check.py` first.
+- Then go in order from `example1.py` upward.
+- Use `example3.py` when you want to inspect live retrieval behavior.
+- Use `example5.py` and `example6.py` to see structured-data and custom-tool patterns.
+- Use `example7.py` and `example8.py` for the more advanced multi-agent workflows.
 
 ## Disclaimer
 
