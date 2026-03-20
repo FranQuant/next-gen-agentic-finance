@@ -238,8 +238,15 @@ class MCPMacroAdapter:
                 }
             )
             if state:
-                self.last_fetch_report["live_macro_used"] = True
-                self.last_fetch_report["mode"] = "mcp-live"
+                self.last_fetch_report["live_macro_used"] = bool(trace.get("live_count", 0))
+                self.last_fetch_report["fallback_used"] = bool(trace.get("partial_fallback", False))
+                self.last_fetch_report["partial_fallback"] = bool(trace.get("partial_fallback", False))
+                self.last_fetch_report["missing_indicators"] = list(trace.get("missing_indicators", []))
+                self.last_fetch_report["live_indicator_count"] = int(trace.get("live_count", 0))
+                self.last_fetch_report["requested_indicator_count"] = len(normalized_indicators)
+                self.last_fetch_report["mode"] = (
+                    "mcp-partial-fallback" if trace.get("partial_fallback", False) else "mcp-live"
+                )
                 return state
         except Exception as exc:
             self._append_report_entry(
@@ -286,12 +293,19 @@ class MCPMacroAdapter:
         if not values:
             return None, {"parsed_output": parsed_output, "missing_indicators": indicators}
 
+        live_count = len(indicators) - len(missing)
+        if live_count <= 0:
+            return None, {"parsed_output": parsed_output, "missing_indicators": indicators, "live_count": 0}
+
         regime = str(payload.get("regime") or self._classify_regime(values))
         notes = self._normalize_notes(payload.get("notes"))
-        notes = self._ensure_source_note(notes, str(payload.get("source") or "mcp-live"))
-        live_count = len(indicators) - len(missing)
+        source = str(payload.get("source") or "mcp-live")
+        if missing:
+            source = "mcp-partial-fallback"
+        notes = self._ensure_source_note(notes, source)
         notes.append(f"macro completeness: {live_count}/{len(indicators)} requested indicators sourced live.")
         if missing:
+            notes.append("partial macro fallback was required for missing indicators.")
             notes.append(f"missing indicators filled with fallback: {', '.join(missing)}")
 
         return (
@@ -304,6 +318,8 @@ class MCPMacroAdapter:
             {
                 "parsed_output": parsed_output,
                 "missing_indicators": missing,
+                "live_count": live_count,
+                "partial_fallback": bool(missing),
             },
         )
 
@@ -487,7 +503,11 @@ class MCPMacroAdapter:
             "requested_indicators": list(indicators or []),
             "live_macro_used": False,
             "fallback_used": False,
+            "partial_fallback": False,
             "mode": "uninitialized",
+            "missing_indicators": [],
+            "live_indicator_count": 0,
+            "requested_indicator_count": len(indicators or []),
             "tool_calls": [],
         }
 

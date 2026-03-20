@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 try:
-    from ..schemas import PortfolioView, ResearchBrief, RunRecord
+    from ..schemas import ResearchBrief, RunRecord, TacticalView
 except ImportError:  # pragma: no cover
-    from schemas import PortfolioView, ResearchBrief, RunRecord
+    from schemas import ResearchBrief, RunRecord, TacticalView
 
 
 class PortfolioSynthesisAgent:
@@ -31,8 +31,9 @@ class PortfolioSynthesisAgent:
         market_view: dict,
         macro_view: dict,
         history: list[RunRecord] | None = None,
-    ) -> PortfolioView:
+    ) -> TacticalView:
         universe = self._normalize_universe(brief.tickers)
+        intent = self._classify_intent(brief=brief, query=query, universe=universe)
         web_score = float(web_view.get("sentiment_score", 0.0))
         market_score = float(market_view.get("trend_score", 0.0))
         macro_score = float(macro_view.get("macro_score", 0.0))
@@ -57,7 +58,7 @@ class PortfolioSynthesisAgent:
         score = web_score + market_score + macro_score + intent_score
 
         if history:
-            last_signal = history[0].portfolio_signal.upper()
+            last_signal = history[0].stance_signal.upper()
             if last_signal == "LONG" and score > 0.25:
                 score += 0.02
             if last_signal == "SHORT" and score < -0.25:
@@ -88,42 +89,78 @@ class PortfolioSynthesisAgent:
             conviction = min(conviction, 0.4)
         conviction = min(0.85, max(0.2, conviction))
         market_notes = market_view.get("notes", [])
-        market_data_weak = market_view.get("trend") == "unknown" or bool(market_notes)
+        macro_notes = macro_view.get("notes", [])
+        synthetic_market = market_view.get("trend") == "unknown" or self._notes_contain_any(
+            market_notes,
+            ("fallback", "placeholder"),
+        )
+        synthetic_macro = self._notes_contain_any(
+            macro_notes,
+            (
+                "source: mcp-fallback",
+                "source: mcp-partial",
+                "missing indicators filled with fallback",
+                "macro completeness: 0/",
+            ),
+        )
+        market_data_weak = synthetic_market or bool(market_notes)
         if market_data_weak:
             conviction = min(conviction, 0.35)
         degraded_evidence = evidence_mode in {"fallback_only", "none"}
         if degraded_evidence:
             signal = "NEUTRAL"
             conviction = 0.2
+        elif synthetic_market or synthetic_macro:
+            conviction = min(conviction, 0.3)
+            strong_live_web_alignment = (
+                evidence_mode == "live"
+                and float(web_view.get("confidence", 0.0)) >= 0.65
+                and (
+                    (signal == "LONG" and web_sentiment == "positive")
+                    or (signal == "SHORT" and web_sentiment == "negative")
+                )
+            )
+            if not strong_live_web_alignment:
+                signal = "NEUTRAL"
+                conviction = min(conviction, 0.25)
 
+        if intent == "defensive" and signal == "SHORT":
+            signal = "LONG"
+            conviction = min(max(conviction, 0.25), 0.55)
+
+        preferred_exposures: list[str] = []
+        avoid_exposures: list[str] = []
         if degraded_evidence:
-            allocations = {"CASH": 1.0}
+            preferred_exposures = []
+            avoid_exposures = []
         elif not universe:
             signal = "VIEW_ONLY"
             conviction = 0.2
-            allocations = {"CASH": 1.0}
+            preferred_exposures = []
+            avoid_exposures = []
         else:
-            allocations = self._build_allocations(
+            preferred_exposures, avoid_exposures = self._build_exposure_guidance(
                 signal=signal,
                 tickers=universe,
-                conviction=conviction,
                 query=query,
                 brief=brief,
             )
-            if self._is_cash_only(allocations):
+            if signal == "SHORT" and not avoid_exposures:
                 signal = "NO_ACTION"
                 conviction = min(conviction, 0.25)
+                preferred_exposures = []
+                avoid_exposures = []
 
-        thesis: list[str] = []
-        thesis.extend(web_view.get("key_points", [])[:2])
-        thesis.append(market_view.get("summary", "Market signal is mixed."))
-        thesis.append(macro_view.get("summary", "Macro signal is mixed."))
+        stance_basis: list[str] = []
+        stance_basis.extend(web_view.get("key_points", [])[:2])
+        stance_basis.append(market_view.get("summary", "Market signal is mixed."))
+        stance_basis.append(macro_view.get("summary", "Macro signal is mixed."))
         if degraded_evidence:
-            thesis.insert(0, "Live web evidence was unavailable; output is research-only and non-actionable.")
+            stance_basis.insert(0, "Live web evidence was unavailable; output is research-only and non-actionable.")
         elif signal == "VIEW_ONLY":
-            thesis.insert(0, "No clean tradable universe was identified; maintain a research-only view.")
+            stance_basis.insert(0, "No clean tradable universe was identified; maintain a research-only view.")
         elif signal == "NO_ACTION":
-            thesis.insert(0, "A tradable expression was not robust enough to justify deployment; remain in cash.")
+            stance_basis.insert(0, "No directional handoff was robust enough to justify a clear tactical preference.")
 
         risks: list[str] = []
         risks.extend(web_view.get("risks", [])[:2])
@@ -137,18 +174,59 @@ class PortfolioSynthesisAgent:
         if signal == "VIEW_ONLY":
             risks.insert(0, "No tradable universe was identified; output is research-only and non-actionable.")
         elif signal == "NO_ACTION":
-            risks.insert(0, "No coherent tradable allocation was available; capital remains in cash.")
+            risks.insert(0, "No coherent tactical preference could be expressed from the available evidence.")
         if not risks:
             risks.append("Model confidence is modest because signals are lightweight.")
 
-        return PortfolioView(
+        return TacticalView(
             signal=signal,
             conviction=round(conviction, 2),
             horizon=brief.timeframe,
-            allocations=allocations,
-            thesis=thesis,
+            preferred_exposures=preferred_exposures,
+            avoid_exposures=avoid_exposures,
+            stance_basis=stance_basis,
             risks=risks,
         )
+
+    def _build_exposure_guidance(
+        self,
+        signal: str,
+        tickers: list[str],
+        query: str,
+        brief: ResearchBrief,
+    ) -> tuple[list[str], list[str]]:
+        universe = self._normalize_universe(tickers)
+        if not universe or signal in {"VIEW_ONLY", "NO_ACTION"}:
+            return [], []
+
+        intent = self._classify_intent(brief=brief, query=query, universe=universe)
+        equities, defensives, bonds, tech = self._split_universe(universe)
+        preferred, secondary = self._intent_buckets(intent, equities, defensives, bonds, tech)
+        preferred = preferred or universe
+
+        if signal == "LONG":
+            avoid = [ticker for ticker in universe if ticker not in preferred and ticker not in secondary]
+            return preferred[:4], avoid[:3]
+
+        if signal == "SHORT":
+            if intent == "bond":
+                preferred_defensive = [ticker for ticker in (defensives or bonds) if ticker not in self.LONG_DURATION_BONDS]
+                avoid = [ticker for ticker in universe if ticker in self.LONG_DURATION_BONDS] or universe[:1]
+                return (preferred_defensive or bonds or universe)[:4], avoid[:3]
+            if intent == "defensive":
+                return (defensives or bonds or universe)[:4], []
+            preferred_defensive = (secondary or defensives or bonds or universe)[:4]
+            avoid = (preferred or equities or universe)[:3]
+            return preferred_defensive, avoid
+
+        if intent in {"bond", "defensive"}:
+            return (preferred or defensives or bonds or universe)[:4], []
+
+        balanced = []
+        for ticker in (secondary + preferred) if secondary else preferred:
+            if ticker not in balanced:
+                balanced.append(ticker)
+        return balanced[:4], []
 
     def _normalize_universe(self, tickers: list[str]) -> list[str]:
         universe: list[str] = []
@@ -200,7 +278,7 @@ class PortfolioSynthesisAgent:
             secondary_total = round(long_total - preferred_total, 4)
 
             allocations = self._allocate_bucket(preferred, preferred_total)
-            allocations.update(self._allocate_bucket(secondary, secondary_total))
+            self._merge_allocations(allocations, self._allocate_bucket(secondary, secondary_total))
             cash = round(max(0.0, 1.0 - sum(allocations.values())), 4)
             if cash > 0:
                 allocations["CASH"] = cash
@@ -209,12 +287,12 @@ class PortfolioSynthesisAgent:
         if signal == "SHORT":
             short_total = self._clamp(0.35 + (0.45 * conviction) - intent_bias, 0.30, 0.85)
             short_targets = preferred or (equities if equities else universe)
-            hedge_targets = secondary or defensives
+            hedge_targets = [ticker for ticker in (secondary or defensives) if ticker not in short_targets]
 
             allocations = self._allocate_bucket(short_targets, -short_total)
             hedge_total = round(1.0 + short_total, 4)
             if hedge_targets:
-                allocations.update(self._allocate_bucket(hedge_targets, hedge_total))
+                self._merge_allocations(allocations, self._allocate_bucket(hedge_targets, hedge_total))
             else:
                 allocations["CASH"] = hedge_total
             return self._rebalance_sum_to_one(allocations)
@@ -227,8 +305,8 @@ class PortfolioSynthesisAgent:
         preferred_share = self._clamp(0.58 + 0.18 * conviction, 0.58, 0.75)
         preferred_total = round(active_total * preferred_share, 4)
         secondary_total = round(active_total - preferred_total, 4)
-        allocations.update(self._allocate_bucket(preferred, preferred_total))
-        allocations.update(self._allocate_bucket(secondary, secondary_total))
+        self._merge_allocations(allocations, self._allocate_bucket(preferred, preferred_total))
+        self._merge_allocations(allocations, self._allocate_bucket(secondary, secondary_total))
         return self._rebalance_sum_to_one(allocations)
 
     def _build_bond_intent_allocations(
@@ -256,28 +334,37 @@ class PortfolioSynthesisAgent:
 
             allocations = self._allocate_bucket(bond_core, core_total)
             if equity_satellite and satellite_total > 0:
-                allocations.update(self._allocate_bucket(equity_satellite, satellite_total))
+                self._merge_allocations(allocations, self._allocate_bucket(equity_satellite, satellite_total))
             cash = round(1.0 - sum(allocations.values()), 4)
             allocations["CASH"] = max(0.0, cash)
             return self._rebalance_sum_to_one(allocations)
 
         if signal == "SHORT":
             if conviction < 0.75:
-                cash_weight = self._clamp(0.82 + 0.12 * conviction, 0.82, 0.95)
-                active_total = round(1.0 - cash_weight, 4)
-                defensive_targets = short_duration or bond_core
+                cash_weight = self._clamp(0.80 + 0.10 * (1.0 - conviction), 0.80, 0.92)
+                short_targets = long_duration or bond_core[:1]
+                defensive_targets = [ticker for ticker in (short_duration or bond_core) if ticker not in short_targets]
+                short_total = self._clamp(0.08 + 0.10 * conviction, 0.08, 0.18)
+                hedge_total = round(1.0 - cash_weight + short_total, 4)
                 allocations = {"CASH": round(cash_weight, 4)}
-                allocations.update(self._allocate_bucket(defensive_targets, active_total))
+                self._merge_allocations(allocations, self._allocate_bucket(short_targets, -short_total))
+                if defensive_targets:
+                    self._merge_allocations(allocations, self._allocate_bucket(defensive_targets, hedge_total))
+                else:
+                    allocations["CASH"] = round(allocations["CASH"] + hedge_total, 4)
                 return self._rebalance_sum_to_one(allocations)
 
             short_targets = long_duration or bond_core[:1]
-            hedge_targets = short_duration or [ticker for ticker in bond_core if ticker not in short_targets]
+            hedge_targets = [
+                ticker for ticker in (short_duration or [ticker for ticker in bond_core if ticker not in short_targets])
+                if ticker not in short_targets
+            ]
             short_total = self._clamp(0.22 + 0.20 * conviction, 0.22, 0.40)
             hedge_total = round(1.0 + short_total, 4)
 
             allocations = self._allocate_bucket(short_targets, -short_total)
             if hedge_targets:
-                allocations.update(self._allocate_bucket(hedge_targets, hedge_total))
+                self._merge_allocations(allocations, self._allocate_bucket(hedge_targets, hedge_total))
             else:
                 allocations["CASH"] = hedge_total
             return self._rebalance_sum_to_one(allocations)
@@ -288,9 +375,9 @@ class PortfolioSynthesisAgent:
         satellite_total = round(active_total - core_total, 4)
 
         allocations = {"CASH": round(cash_weight, 4)}
-        allocations.update(self._allocate_bucket(bond_core, core_total))
+        self._merge_allocations(allocations, self._allocate_bucket(bond_core, core_total))
         if equity_satellite and satellite_total > 0:
-            allocations.update(self._allocate_bucket(equity_satellite, satellite_total))
+            self._merge_allocations(allocations, self._allocate_bucket(equity_satellite, satellite_total))
         return self._rebalance_sum_to_one(allocations)
 
     def _split_universe(self, tickers: list[str]) -> tuple[list[str], list[str], list[str], list[str]]:
@@ -382,6 +469,17 @@ class PortfolioSynthesisAgent:
             return {}
         weight = round(total_weight / len(tickers), 4)
         return {ticker: weight for ticker in tickers}
+
+    def _merge_allocations(self, base: dict[str, float], addition: dict[str, float]) -> None:
+        for ticker, weight in addition.items():
+            base[ticker] = round(base.get(ticker, 0.0) + weight, 4)
+
+    def _notes_contain_any(self, notes: list[str], terms: tuple[str, ...]) -> bool:
+        for note in notes:
+            normalized = str(note).lower()
+            if any(term in normalized for term in terms):
+                return True
+        return False
 
     def _is_cash_only(self, allocations: dict[str, float]) -> bool:
         if not allocations:

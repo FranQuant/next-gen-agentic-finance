@@ -176,16 +176,32 @@ def get_macro_state(indicators: list[str] | None = None, normalize: bool = True)
 
     values: dict[str, float] = {}
     notes = ["source: mcp-live"]
+    failed_indicators: list[str] = []
     for indicator in deduped_requested:
-        values[indicator] = round(float(_fetch_latest(indicator)), 3)
+        try:
+            values[indicator] = round(float(_fetch_latest(indicator)), 3)
+        except Exception as exc:
+            failed_indicators.append(indicator)
+            notes.append(f"{indicator}: live fetch failed ({type(exc).__name__}).")
 
     if normalize:
-        notes.extend(_normalization_notes(deduped_requested))
+        notes.extend(_normalization_notes(list(values.keys())))
+
+    source = "mcp-live"
+    if failed_indicators and values:
+        source = "mcp-partial-live"
+        notes[0] = f"source: {source}"
+        notes.append(f"failed indicators omitted from live response: {', '.join(failed_indicators)}")
+    elif failed_indicators and not values:
+        source = "mcp-live-error"
+        notes[0] = f"source: {source}"
+        notes.append("all requested indicators failed live retrieval.")
 
     return {
         "as_of": _now_iso(),
-        "source": "mcp-live",
+        "source": source,
         "indicators": values,
+        "failed_indicators": failed_indicators,
         "regime": _classify_regime(values),
         "notes": notes,
     }

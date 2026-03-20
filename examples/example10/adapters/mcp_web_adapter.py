@@ -535,9 +535,13 @@ class MCPWebAdapter:
         if structured_items:
             return structured_items
 
-        direct = response.get("results")
-        if isinstance(direct, list):
-            return [self._with_origin(item, "results") for item in direct if isinstance(item, dict)]
+        for key in self.RESULT_CONTAINER_KEYS:
+            direct = response.get(key)
+            if direct is None:
+                continue
+            direct_items = self._extract_structured_items(direct, origin=f"response.{key}")
+            if direct_items:
+                return direct_items
 
         content_items = self._extract_content_items(response.get("content"), topic=topic)
         if content_items:
@@ -628,21 +632,31 @@ class MCPWebAdapter:
         return items
 
     def _parse_text_payload(self, text: str, topic: str, origin: str) -> list[dict[str, Any]]:
+        if self._is_empty_text_reply(text):
+            return []
+
         try:
             payload = json.loads(text)
         except Exception:
-            return [{"title": topic, "summary": text, "source": "web", "_origin": f"{origin}.raw"}]
+            return []
 
         if isinstance(payload, list):
-            return [self._with_origin(item, f"{origin}.json") for item in payload if isinstance(item, dict)]
+            return self._extract_structured_items(payload, origin=f"{origin}.json")
 
         if isinstance(payload, dict):
             nested = self._extract_structured_items(payload, origin=f"{origin}.json")
             if nested:
                 return nested
-            return [self._with_origin(payload, f"{origin}.json")]
+            status_text = self._flatten_text(
+                payload.get("message") or payload.get("detail") or payload.get("answer") or payload.get("response")
+            )
+            if self._is_empty_text_reply(status_text or text):
+                return []
+            if self._looks_like_result_item(payload):
+                return [self._with_origin(payload, f"{origin}.json")]
+            return []
 
-        return [{"title": topic, "summary": text, "source": "web", "_origin": f"{origin}.raw"}]
+        return []
 
     def _is_thin(self, records: list[dict[str, Any]]) -> bool:
         if len(records) < self.max_results_per_topic:
@@ -1172,6 +1186,24 @@ class MCPWebAdapter:
         annotated = dict(item)
         annotated.setdefault("_origin", origin)
         return annotated
+
+    def _is_empty_text_reply(self, text: str) -> bool:
+        normalized = self._clean_text(text).lower()
+        if not normalized:
+            return True
+        empty_phrases = (
+            "no results found",
+            "no result found",
+            "no search results",
+            "no relevant results",
+            "no documents found",
+            "no items found",
+            "no sources found",
+            "no matching results",
+            "no evidence found",
+            "nothing found",
+        )
+        return any(phrase in normalized for phrase in empty_phrases)
 
     def _append_report_entry(self, bucket: str, payload: dict[str, Any]) -> None:
         entries = self.last_search_report.setdefault(bucket, [])
