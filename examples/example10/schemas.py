@@ -44,13 +44,25 @@ class MacroState:
 
 
 @dataclass
-class PortfolioView:
+class TacticalView:
     signal: str
     conviction: float
     horizon: str
-    allocations: dict[str, float]
-    thesis: list[str]
-    risks: list[str]
+    risks: list[str] = field(default_factory=list)
+    preferred_exposures: list[str] = field(default_factory=list)
+    avoid_exposures: list[str] = field(default_factory=list)
+    stance_basis: list[str] = field(default_factory=list)
+
+    @property
+    def thesis(self) -> list[str]:
+        return self.stance_basis
+
+    @property
+    def allocations(self) -> dict[str, float]:
+        return {}
+
+
+PortfolioView = TacticalView
 
 
 @dataclass
@@ -58,9 +70,13 @@ class RunRecord:
     run_id: str
     created_at: str
     query: str
-    portfolio_signal: str
+    stance_signal: str
     conviction: float
     notes: str = ""
+
+    @property
+    def portfolio_signal(self) -> str:
+        return self.stance_signal
 
 
 @dataclass
@@ -76,7 +92,7 @@ class ResearchPacket:
     macro_state: MacroState
     macro_view: dict[str, Any]
     history: list[RunRecord]
-    portfolio_view: PortfolioView
+    tactical_view: TacticalView
     tactical_state: dict[str, Any] = field(default_factory=dict)
     layer: str = "layer1-evidence-state"
     packet_kind: str = "tactical-view-packet"
@@ -86,3 +102,7 @@ class ResearchPacket:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    @property
+    def portfolio_view(self) -> TacticalView:
+        return self.tactical_view

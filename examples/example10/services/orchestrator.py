@@ -76,7 +76,7 @@ class ResearchOrchestrator:
 
         history = self.storage.get_recent_runs(limit=self.history_limit)
 
-        portfolio_view = self.portfolio_synthesis_agent.synthesize(
+        tactical_view = self.portfolio_synthesis_agent.synthesize(
             query=query,
             brief=brief,
             web_view=web_view,
@@ -95,9 +95,9 @@ class ResearchOrchestrator:
             web_report.get("fallback_used") or market_report.get("fallback_used") or macro_report.get("fallback_used")
         )
         neutralized = web_mode in {"fallback_only", "none"}
-        if neutralized or portfolio_view.signal in {"VIEW_ONLY", "NO_ACTION"}:
+        if neutralized or tactical_view.signal in {"VIEW_ONLY", "NO_ACTION"}:
             actionability = "research-only"
-        elif portfolio_view.signal == "NEUTRAL" or degraded:
+        elif tactical_view.signal == "NEUTRAL" or degraded:
             actionability = "cautious-tactical"
         else:
             actionability = "directional-tactical"
@@ -112,9 +112,11 @@ class ResearchOrchestrator:
                 "macro": str(macro_view.get("summary") or "N/A"),
             },
             "stance_summary": {
-                "signal": portfolio_view.signal,
-                "conviction": round(float(portfolio_view.conviction), 2),
-                "horizon": portfolio_view.horizon,
+                "signal": tactical_view.signal,
+                "conviction": round(float(tactical_view.conviction), 2),
+                "horizon": tactical_view.horizon,
+                "preferred_exposures": list(tactical_view.preferred_exposures),
+                "avoid_exposures": list(tactical_view.avoid_exposures),
             },
             "source_trace": {
                 "evidence_count": len(evidence),
@@ -142,7 +144,7 @@ class ResearchOrchestrator:
             macro_state=macro_state,
             macro_view=macro_view,
             history=history,
-            portfolio_view=portfolio_view,
+            tactical_view=tactical_view,
             tactical_state=tactical_state,
             layer="layer1-evidence-state",
             packet_kind="tactical-view-packet",

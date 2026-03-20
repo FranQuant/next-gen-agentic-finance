@@ -24,11 +24,24 @@ class SQLiteStorage:
                     run_id TEXT PRIMARY KEY,
                     created_at TEXT NOT NULL,
                     query TEXT NOT NULL,
-                    portfolio_signal TEXT NOT NULL,
+                    stance_signal TEXT NOT NULL,
+                    portfolio_signal TEXT,
                     conviction REAL NOT NULL,
                     report TEXT NOT NULL,
                     packet_json TEXT NOT NULL
                 )
+                """
+            )
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
+            if "stance_signal" not in columns:
+                conn.execute("ALTER TABLE runs ADD COLUMN stance_signal TEXT")
+            if "portfolio_signal" not in columns:
+                conn.execute("ALTER TABLE runs ADD COLUMN portfolio_signal TEXT")
+            conn.execute(
+                """
+                UPDATE runs
+                SET stance_signal = COALESCE(stance_signal, portfolio_signal)
+                WHERE stance_signal IS NULL OR stance_signal = ''
                 """
             )
             conn.commit()
@@ -42,18 +55,20 @@ class SQLiteStorage:
                     run_id,
                     created_at,
                     query,
+                    stance_signal,
                     portfolio_signal,
                     conviction,
                     report,
                     packet_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     packet.run_id,
                     packet.created_at,
                     packet.query,
-                    packet.portfolio_view.signal,
-                    packet.portfolio_view.conviction,
+                    packet.tactical_view.signal,
+                    packet.tactical_view.signal,
+                    packet.tactical_view.conviction,
                     packet.report,
                     payload,
                 ),
@@ -64,7 +79,7 @@ class SQLiteStorage:
         with sqlite3.connect(self.db_path) as conn:
             rows = conn.execute(
                 """
-                SELECT run_id, created_at, query, portfolio_signal, conviction, report
+                SELECT run_id, created_at, query, COALESCE(stance_signal, portfolio_signal), conviction, report
                 FROM runs
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -77,7 +92,7 @@ class SQLiteStorage:
                 run_id=row[0],
                 created_at=row[1],
                 query=row[2],
-                portfolio_signal=row[3],
+                stance_signal=row[3],
                 conviction=float(row[4]),
                 notes=(row[5].splitlines()[0] if row[5] else ""),
             )

@@ -20,7 +20,7 @@ class ReportFormatter:
             ),
             f"- Packet Kind: {packet.packet_kind}",
             f"- Actionability: {packet.actionability}",
-            "- Role: reusable evidence/state handoff for downstream tactical allocation review.",
+            "- Role: reusable evidence/state handoff for downstream allocator or PM review.",
         ]
 
         stance_line = self._stance_delta_line(packet)
@@ -32,7 +32,7 @@ class ReportFormatter:
         state_lines = self._state_snapshot_lines(packet)
         stance_lines = self._tactical_stance_lines(packet)
 
-        risk_lines = [f"- {risk}" for risk in packet.portfolio_view.risks[:4]]
+        risk_lines = [f"- {risk}" for risk in packet.tactical_view.risks[:4]]
         if not risk_lines:
             risk_lines = ["- No explicit risks were produced."]
 
@@ -61,8 +61,8 @@ class ReportFormatter:
         if not packet.history:
             return ""
 
-        prior_signal = packet.history[0].portfolio_signal.upper()
-        current_signal = packet.portfolio_view.signal.upper()
+        prior_signal = packet.history[0].stance_signal.upper()
+        current_signal = packet.tactical_view.signal.upper()
         if prior_signal == current_signal:
             return f"- Stance vs Recent History: unchanged ({current_signal})."
         return f"- Stance vs Recent History: {prior_signal} -> {current_signal}."
@@ -102,6 +102,8 @@ class ReportFormatter:
 
         if macro_mode == "mcp-fallback":
             lines.append("- Macro Data: fallback baseline values were used.")
+        elif macro_mode == "mcp-partial-fallback":
+            lines.append("- Macro Data: live MCP macro state was partial; fallback values were used for missing indicators.")
         elif macro_mode == "mcp-live":
             lines.append("- Macro Data: live MCP macro state.")
         elif macro_mode != "unknown":
@@ -174,16 +176,18 @@ class ReportFormatter:
         return lines
 
     def _tactical_stance_lines(self, packet: ResearchPacket) -> list[str]:
-        allocation_parts = [f"{ticker}:{weight:.2f}" for ticker, weight in packet.portfolio_view.allocations.items()]
         lines = [
-            f"- Signal: {packet.portfolio_view.signal}",
-            f"- Conviction: {packet.portfolio_view.conviction:.2f}",
-            f"- Horizon: {packet.portfolio_view.horizon}",
+            f"- Signal: {packet.tactical_view.signal}",
+            f"- Conviction: {packet.tactical_view.conviction:.2f}",
+            f"- Horizon: {packet.tactical_view.horizon}",
             f"- Actionability: {packet.actionability}",
-            f"- Allocations: {', '.join(allocation_parts) if allocation_parts else 'N/A'}",
-            "- Handoff Use: tactical state packet for downstream allocator or PM review, not final portfolio construction.",
+            "- Handoff Use: tactical stance packet for downstream allocator or PM review, not final portfolio construction.",
         ]
-        thesis = packet.portfolio_view.thesis[:2]
-        if thesis:
-            lines.append(f"- Stance Basis: {' | '.join(thesis)}")
+        if packet.tactical_view.preferred_exposures:
+            lines.append(f"- Preferred Exposures: {', '.join(packet.tactical_view.preferred_exposures[:4])}")
+        if packet.tactical_view.avoid_exposures:
+            lines.append(f"- Avoid Exposures: {', '.join(packet.tactical_view.avoid_exposures[:4])}")
+        stance_basis = packet.tactical_view.stance_basis[:2]
+        if stance_basis:
+            lines.append(f"- Stance Basis: {' | '.join(stance_basis)}")
         return lines

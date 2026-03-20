@@ -55,6 +55,8 @@ def _status_lines(packet: Any) -> list[str]:
 
     if macro_mode == "mcp-fallback":
         lines.append("Macro Data: fallback baseline values were used.")
+    elif macro_mode == "mcp-partial-fallback":
+        lines.append("Macro Data: live MCP macro state was partial; fallback values were used for missing indicators.")
     elif macro_mode == "mcp-live":
         lines.append("Macro Data: live MCP macro state.")
     elif macro_mode != "unknown":
@@ -144,19 +146,19 @@ def _render_rich(packet: Any) -> None:
         )
     )
 
-    allocation_text = ", ".join(
-        f"{ticker}:{weight:.2f}" for ticker, weight in packet.portfolio_view.allocations.items()
-    )
     portfolio_lines = [
-        f"Signal: {packet.portfolio_view.signal}",
-        f"Conviction: {packet.portfolio_view.conviction:.2f}",
-        f"Horizon: {packet.portfolio_view.horizon}",
+        f"Signal: {packet.tactical_view.signal}",
+        f"Conviction: {packet.tactical_view.conviction:.2f}",
+        f"Horizon: {packet.tactical_view.horizon}",
         f"Actionability: {getattr(packet, 'actionability', 'tactical')}",
-        f"Allocations: {allocation_text or 'N/A'}",
-        "Handoff Use: tactical state packet for downstream allocator or PM review.",
+        "Handoff Use: tactical stance packet for downstream allocator or PM review.",
     ]
-    if packet.portfolio_view.thesis:
-        portfolio_lines.append("Stance Basis: " + " | ".join(packet.portfolio_view.thesis[:2]))
+    if packet.tactical_view.preferred_exposures:
+        portfolio_lines.append("Preferred Exposures: " + ", ".join(packet.tactical_view.preferred_exposures[:4]))
+    if packet.tactical_view.avoid_exposures:
+        portfolio_lines.append("Avoid Exposures: " + ", ".join(packet.tactical_view.avoid_exposures[:4]))
+    if packet.tactical_view.stance_basis:
+        portfolio_lines.append("Stance Basis: " + " | ".join(packet.tactical_view.stance_basis[:2]))
 
     console.print(
         Panel(
@@ -166,7 +168,7 @@ def _render_rich(packet: Any) -> None:
         )
     )
 
-    risks = packet.portfolio_view.risks[:5] or ["No explicit risks were produced."]
+    risks = packet.tactical_view.risks[:5] or ["No explicit risks were produced."]
     console.print(
         Panel(
             "\n".join(f"- {risk}" for risk in risks),

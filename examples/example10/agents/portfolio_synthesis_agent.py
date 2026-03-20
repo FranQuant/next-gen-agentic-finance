@@ -170,7 +170,7 @@ class PortfolioSynthesisAgent:
             risks.append(f"High realized volatility detected in: {joined}.")
         risks.extend(macro_view.get("risks", [])[:2])
         if evidence_mode in {"fallback_only", "none"}:
-            risks.insert(0, "Fallback-only web evidence detected; actionable portfolio deployment was withheld.")
+            risks.insert(0, "Fallback-only web evidence detected; actionable tactical handoff was withheld.")
         if signal == "VIEW_ONLY":
             risks.insert(0, "No tradable universe was identified; output is research-only and non-actionable.")
         elif signal == "NO_ACTION":
@@ -242,143 +242,6 @@ class PortfolioSynthesisAgent:
         if value <= -0.08:
             return -1
         return 0
-
-    def _build_allocations(
-        self,
-        signal: str,
-        tickers: list[str],
-        conviction: float,
-        query: str,
-        brief: ResearchBrief,
-    ) -> dict[str, float]:
-        universe = self._normalize_universe(tickers)
-
-        if not universe:
-            return {"CASH": 1.0}
-
-        intent = self._classify_intent(brief=brief, query=query, universe=universe)
-        equities, defensives, bonds, tech = self._split_universe(universe)
-        preferred, secondary = self._intent_buckets(intent, equities, defensives, bonds, tech)
-        intent_bias = self._intent_bias(query)
-
-        if intent == "bond":
-            return self._build_bond_intent_allocations(
-                signal=signal,
-                conviction=conviction,
-                intent_bias=intent_bias,
-                bonds=bonds,
-                defensives=defensives,
-                equities=equities,
-            )
-
-        if signal == "LONG":
-            long_total = self._clamp(0.58 + (0.32 * conviction) + intent_bias, 0.55, 0.95)
-            preferred_share = 1.0 if not secondary else self._clamp(0.70 + 0.15 * conviction, 0.70, 0.88)
-            preferred_total = round(long_total * preferred_share, 4)
-            secondary_total = round(long_total - preferred_total, 4)
-
-            allocations = self._allocate_bucket(preferred, preferred_total)
-            self._merge_allocations(allocations, self._allocate_bucket(secondary, secondary_total))
-            cash = round(max(0.0, 1.0 - sum(allocations.values())), 4)
-            if cash > 0:
-                allocations["CASH"] = cash
-            return self._rebalance_sum_to_one(allocations)
-
-        if signal == "SHORT":
-            short_total = self._clamp(0.35 + (0.45 * conviction) - intent_bias, 0.30, 0.85)
-            short_targets = preferred or (equities if equities else universe)
-            hedge_targets = [ticker for ticker in (secondary or defensives) if ticker not in short_targets]
-
-            allocations = self._allocate_bucket(short_targets, -short_total)
-            hedge_total = round(1.0 + short_total, 4)
-            if hedge_targets:
-                self._merge_allocations(allocations, self._allocate_bucket(hedge_targets, hedge_total))
-            else:
-                allocations["CASH"] = hedge_total
-            return self._rebalance_sum_to_one(allocations)
-
-        # Live NEUTRAL means cautious but still invested; degraded/fallback neutralization remains the truly defensive cash-heavy case.
-        cash_weight = round(self._clamp(0.605 - (0.30 * conviction), 0.35, 0.55), 4)
-        active_total = round(1.0 - cash_weight, 4)
-
-        allocations = {"CASH": cash_weight}
-        preferred_share = self._clamp(0.58 + 0.18 * conviction, 0.58, 0.75)
-        preferred_total = round(active_total * preferred_share, 4)
-        secondary_total = round(active_total - preferred_total, 4)
-        self._merge_allocations(allocations, self._allocate_bucket(preferred, preferred_total))
-        self._merge_allocations(allocations, self._allocate_bucket(secondary, secondary_total))
-        return self._rebalance_sum_to_one(allocations)
-
-    def _build_bond_intent_allocations(
-        self,
-        signal: str,
-        conviction: float,
-        intent_bias: float,
-        bonds: list[str],
-        defensives: list[str],
-        equities: list[str],
-    ) -> dict[str, float]:
-        bond_core = bonds or defensives
-        if not bond_core:
-            return {"CASH": 1.0}
-
-        equity_satellite = [ticker for ticker in equities if ticker not in bond_core]
-        short_duration = [ticker for ticker in bond_core if ticker in self.SHORT_DURATION_DEFENSIVES]
-        long_duration = [ticker for ticker in bond_core if ticker in self.LONG_DURATION_BONDS]
-
-        if signal == "LONG":
-            active_total = self._clamp(0.58 + (0.30 * conviction) + max(0.0, intent_bias), 0.60, 0.95)
-            core_share = self._clamp(0.86 + 0.10 * conviction, 0.86, 0.95)
-            core_total = round(active_total * core_share, 4)
-            satellite_total = round(active_total - core_total, 4)
-
-            allocations = self._allocate_bucket(bond_core, core_total)
-            if equity_satellite and satellite_total > 0:
-                self._merge_allocations(allocations, self._allocate_bucket(equity_satellite, satellite_total))
-            cash = round(1.0 - sum(allocations.values()), 4)
-            allocations["CASH"] = max(0.0, cash)
-            return self._rebalance_sum_to_one(allocations)
-
-        if signal == "SHORT":
-            if conviction < 0.75:
-                cash_weight = self._clamp(0.80 + 0.10 * (1.0 - conviction), 0.80, 0.92)
-                short_targets = long_duration or bond_core[:1]
-                defensive_targets = [ticker for ticker in (short_duration or bond_core) if ticker not in short_targets]
-                short_total = self._clamp(0.08 + 0.10 * conviction, 0.08, 0.18)
-                hedge_total = round(1.0 - cash_weight + short_total, 4)
-                allocations = {"CASH": round(cash_weight, 4)}
-                self._merge_allocations(allocations, self._allocate_bucket(short_targets, -short_total))
-                if defensive_targets:
-                    self._merge_allocations(allocations, self._allocate_bucket(defensive_targets, hedge_total))
-                else:
-                    allocations["CASH"] = round(allocations["CASH"] + hedge_total, 4)
-                return self._rebalance_sum_to_one(allocations)
-
-            short_targets = long_duration or bond_core[:1]
-            hedge_targets = [
-                ticker for ticker in (short_duration or [ticker for ticker in bond_core if ticker not in short_targets])
-                if ticker not in short_targets
-            ]
-            short_total = self._clamp(0.22 + 0.20 * conviction, 0.22, 0.40)
-            hedge_total = round(1.0 + short_total, 4)
-
-            allocations = self._allocate_bucket(short_targets, -short_total)
-            if hedge_targets:
-                self._merge_allocations(allocations, self._allocate_bucket(hedge_targets, hedge_total))
-            else:
-                allocations["CASH"] = hedge_total
-            return self._rebalance_sum_to_one(allocations)
-
-        cash_weight = self._clamp(0.74 + 0.16 * (1.0 - conviction), 0.74, 0.90)
-        active_total = round(1.0 - cash_weight, 4)
-        core_total = round(active_total * 0.90, 4)
-        satellite_total = round(active_total - core_total, 4)
-
-        allocations = {"CASH": round(cash_weight, 4)}
-        self._merge_allocations(allocations, self._allocate_bucket(bond_core, core_total))
-        if equity_satellite and satellite_total > 0:
-            self._merge_allocations(allocations, self._allocate_bucket(equity_satellite, satellite_total))
-        return self._rebalance_sum_to_one(allocations)
 
     def _split_universe(self, tickers: list[str]) -> tuple[list[str], list[str], list[str], list[str]]:
         equities: list[str] = []
@@ -464,45 +327,9 @@ class PortfolioSynthesisAgent:
             return -0.12
         return 0.0
 
-    def _allocate_bucket(self, tickers: list[str], total_weight: float) -> dict[str, float]:
-        if not tickers:
-            return {}
-        weight = round(total_weight / len(tickers), 4)
-        return {ticker: weight for ticker in tickers}
-
-    def _merge_allocations(self, base: dict[str, float], addition: dict[str, float]) -> None:
-        for ticker, weight in addition.items():
-            base[ticker] = round(base.get(ticker, 0.0) + weight, 4)
-
     def _notes_contain_any(self, notes: list[str], terms: tuple[str, ...]) -> bool:
         for note in notes:
             normalized = str(note).lower()
             if any(term in normalized for term in terms):
                 return True
         return False
-
-    def _is_cash_only(self, allocations: dict[str, float]) -> bool:
-        if not allocations:
-            return True
-
-        non_cash = [ticker for ticker, weight in allocations.items() if ticker != "CASH" and abs(weight) > 0.0001]
-        cash_weight = float(allocations.get("CASH", 0.0))
-        return not non_cash and cash_weight >= 0.9999
-
-    def _rebalance_sum_to_one(self, allocations: dict[str, float]) -> dict[str, float]:
-        total = round(sum(allocations.values()), 4)
-        if abs(total - 1.0) <= 0.0001:
-            return allocations
-
-        adjustment = round(1.0 - total, 4)
-        if "CASH" in allocations:
-            allocations["CASH"] = round(allocations["CASH"] + adjustment, 4)
-            return allocations
-
-        first_key = next(iter(allocations), None)
-        if first_key is not None:
-            allocations[first_key] = round(allocations[first_key] + adjustment, 4)
-        return allocations
-
-    def _clamp(self, value: float, low: float, high: float) -> float:
-        return max(low, min(high, value))
