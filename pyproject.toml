@@ -1,20 +1,18 @@
 [project]
 name = "nextgen-agentic-finance"
 version = "0.1.0"
-description = "Reference agentic finance examples spanning AGNO demos, research teams, and packaged multi-source orchestrators."
+description = "Focused learning examples for agentic finance workflows, including retrieval, structured data, custom tools, and multi-agent research handoff."
 readme = "README.md"
 requires-python = ">=3.13"
 
 dependencies = [
     "agno>=2.1.4",
     "duckdb>=1.4.1",
-    "mcp[cli]>=1.19.0",
     "numpy>=2.0",
     "openai>=2.3.0",
     "pandas>=2.3.3",
     "sqlalchemy>=2.0.44",
     "python-dotenv>=1.0",
-    "fredapi>=0.5.2",
     "tavily-python>=0.7.21",
     "yfinance>=0.2",
 ]
