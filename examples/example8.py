@@ -1,5 +1,6 @@
 """Example 8: compact structured research handoff workflow."""
 
+import os
 from textwrap import dedent
 
 from dotenv import load_dotenv
@@ -18,10 +19,14 @@ from finance_tools import (
 
 load_dotenv()
 
+DEFAULT_MODEL_ID = os.getenv("EXAMPLE8_MODEL_ID", os.getenv("OPENAI_MODEL_ID", "gpt-5.4"))
+TEAM_DB_PATH = "tmp/research_team.db"
+
 
 def build_team() -> Team:
-    db = SqliteDb(db_file="tmp/research_team.db")
-    model = OpenAIResponses(id="gpt-5.4")
+    os.makedirs("tmp", exist_ok=True)
+    db = SqliteDb(db_file=TEAM_DB_PATH)
+    model = OpenAIResponses(id=DEFAULT_MODEL_ID)
 
     market_data_agent = Agent(
         name="market-data-agent",
