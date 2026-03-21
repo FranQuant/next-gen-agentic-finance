@@ -10,6 +10,16 @@ Built with:
 - yfinance market data
 - local CSV / SQL-style querying for structured data examples
 
+## What this repository is / is not
+
+**What it is**
+- A focused educational demos repository for agentic finance patterns, covering prompt engineering, live retrieval, retrieval debugging, structured data access, custom finance tools, multi-agent orchestration, and structured research handoff.
+- Intended for learning, experimentation, and bounded prototype workflows.
+
+**What it is not**
+- Not a production research platform, live trading or execution system, portfolio optimizer, or OMS/EMS.
+- Not investment advice; `example7.py` and `example8.py` should be understood as bounded prototype workflows, not deployable PM infrastructure.
+
 ## 1. Setup
 
 This repository expects **Python 3.13** and uses `uv` for environment and dependency management.
