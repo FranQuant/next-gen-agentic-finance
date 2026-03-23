@@ -1,7 +1,7 @@
 ticker,name,weight,thesis,risk_bucket,region,priority,notes
-NU,Nu Holdings,0.22,LatAm digital banking and fintech compounder,High,Brazil / LatAm,1,"Core fintech monitoring name; watch regulation, funding, and credit trends."
-MELI,MercadoLibre,0.26,E-commerce and fintech platform leader,High,LatAm,1,"Monitor commerce demand, credit quality, logistics execution, and competitive intensity."
-PBR,Petrobras,0.14,Cash-generative oil major with state-policy sensitivity,Very High,Brazil,1,"Monitor oil price sensitivity, capex policy, dividends, and government intervention risk."
-GGAL,Grupo Financiero Galicia,0.1,Argentina banking exposure with reform optionality,Very High,Argentina,2,"Monitor macro stabilization, policy changes, liquidity conditions, and FX regime shifts."
-CIB,Bancolombia,0.13,Leading Colombia banking franchise with regional exposure,Medium,Colombia,2,"Monitor loan growth, NIM pressure, asset quality, and sovereign/macroeconomic headlines."
-SQM,Sociedad Quimica y Minera,0.15,Lithium and specialty chemicals exposure,Cyclical,Chile,2,"Monitor lithium price cycle, Chile policy developments, and demand normalization signals."
+AAPL,Apple Inc,0.18,Consumer platform and installed-base monetization,Medium,US,1,"Monitor device demand, services mix, regulatory pressure, and supply chain developments."
+MSFT,Microsoft Corp,0.20,Enterprise software and AI platform leader,Medium,US,1,"Monitor Azure growth, AI monetization, capex discipline, and enterprise demand."
+NVDA,NVIDIA Corp,0.18,AI infrastructure and accelerator leader,High,US,1,"Monitor hyperscaler demand, product roadmap, export controls, and competitive dynamics."
+AMZN,Amazon.com Inc,0.16,E-commerce and cloud platform with operating leverage,Medium,US,2,"Monitor AWS trends, retail margins, logistics efficiency, and AI-related capex."
+JPM,JPMorgan Chase & Co,0.14,Systemically important bank with diversified earnings base,Medium,US,2,"Monitor NII trajectory, credit quality, capital returns, and regulatory developments."
+META,Meta Platforms Inc,0.14,Digital advertising and AI-driven platform monetization,Medium,US,2,"Monitor ad demand, engagement trends, AI monetization, capex discipline, and regulatory pressure."
