@@ -61,6 +61,7 @@ Set the keys needed for the examples you want to run:
 
 - `OPENAI_API_KEY` — required for OpenAI-powered examples
 - `TAVILY_API_KEY` — required for web search and live news retrieval examples
+- `EXAMPLE9_TAVILY_MCP_URL` — required for `example9.py` remote Tavily MCP connection
 - `FRED_API_KEY` — optional for future macro-oriented demos if added later
 
 See `.env.example` for the current template and optional per-example model overrides.
@@ -78,6 +79,7 @@ See `.env.example` for the current template and optional per-example model overr
 | `example6.py` | Custom finance tool example: options maximum pain |
 | `example7.py` | Clean multi-agent stock research orchestration |
 | `example8.py` | Compact structured research handoff |
+| `example9.py` | Agno + Tavily remote MCP issuer-intelligence demo |
 
 ## 4. Progression
 
@@ -90,6 +92,7 @@ See `.env.example` for the current template and optional per-example model overr
 - `example6.py` → custom domain-specific finance tool
 - `example7.py` → first clean multi-agent research brief
 - `example8.py` → structured research handoff with explicit open questions and gaps
+- `example9.py` → issuer-intelligence workflow via Agno + Tavily remote MCP
 
 ## 5. Shared Utility Layer
 
@@ -112,6 +115,7 @@ next-gen-agentic-finance/
 │   ├── example6.py
 │   ├── example7.py
 │   ├── example8.py
+│   ├── example9.py
 │   └── finance_tools.py
 ├── README.md
 ├── pyproject.toml
@@ -125,6 +129,7 @@ next-gen-agentic-finance/
 - Use `example3.py` when you want to inspect live retrieval behavior.
 - Use `example5.py` and `example6.py` to see structured-data and custom-tool patterns.
 - Use `example7.py` and `example8.py` for the more advanced multi-agent workflows.
+- Use `example9.py` for a bounded issuer-intelligence demo using Agno with Tavily remote MCP.
 
 ## Disclaimer
 
