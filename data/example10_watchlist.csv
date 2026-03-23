@@ -1,0 +1,7 @@
+ticker,name,weight,thesis,risk_bucket,region,priority,notes
+NU,Nu Holdings,0.22,LatAm digital banking and fintech compounder,High,Brazil / LatAm,1,"Core fintech monitoring name; watch regulation, funding, and credit trends."
+MELI,MercadoLibre,0.26,E-commerce and fintech platform leader,High,LatAm,1,"Monitor commerce demand, credit quality, logistics execution, and competitive intensity."
+PBR,Petrobras,0.14,Cash-generative oil major with state-policy sensitivity,Very High,Brazil,1,"Monitor oil price sensitivity, capex policy, dividends, and government intervention risk."
+GGAL,Grupo Financiero Galicia,0.1,Argentina banking exposure with reform optionality,Very High,Argentina,2,"Monitor macro stabilization, policy changes, liquidity conditions, and FX regime shifts."
+CIB,Bancolombia,0.13,Leading Colombia banking franchise with regional exposure,Medium,Colombia,2,"Monitor loan growth, NIM pressure, asset quality, and sovereign/macroeconomic headlines."
+SQM,Sociedad Quimica y Minera,0.15,Lithium and specialty chemicals exposure,Cyclical,Chile,2,"Monitor lithium price cycle, Chile policy developments, and demand normalization signals."
