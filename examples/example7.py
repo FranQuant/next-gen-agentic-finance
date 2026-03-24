@@ -1,6 +1,7 @@
 """Example 7: staged multi-agent stock research brief with optional reasoning and persistence."""
 
 import os
+from pathlib import Path
 from textwrap import dedent
 
 from dotenv import load_dotenv
@@ -38,7 +39,7 @@ STOCK_SEARCHER_MODEL_ID = os.getenv("EXAMPLE7_STOCK_SEARCHER_MODEL_ID", DEFAULT_
 COMPANY_INFO_MODEL_ID = os.getenv("EXAMPLE7_COMPANY_INFO_MODEL_ID", DEFAULT_MODEL_ID)
 ORCHESTRATOR_MODEL_ID = os.getenv("EXAMPLE7_ORCHESTRATOR_MODEL_ID", DEFAULT_MODEL_ID)
 
-TEAM_DB_PATH = "tmp/example7_team.db"
+TEAM_DB_PATH = Path(__file__).resolve().parents[1] / "tmp" / "example7_team.db"
 DEMO_PROMPT = (
     "Research NVDA and produce a concise institutional-style brief using available market "
     "data, fundamentals, and recent company news."
@@ -48,7 +49,7 @@ DEMO_PROMPT = (
 def build_team() -> Team:
     db = None
     if ENABLE_DB:
-        os.makedirs("tmp", exist_ok=True)
+        TEAM_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         db = SqliteDb(db_file=TEAM_DB_PATH)
 
     team_tools = []
