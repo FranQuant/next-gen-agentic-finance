@@ -37,16 +37,13 @@ _PREFERRED_NEWS_DOMAINS = {
     "cnbc.com",
     "apnews.com",
     "finance.yahoo.com",
-    "investor.apple.com",
     "sec.gov",
 }
 
 _EVENT_NEWS_DOMAINS = {
     "techcrunch.com",
-    "macrumors.com",
     "theguardian.com",
     "theverge.com",
-    "9to5mac.com",
 }
 
 _LOW_VALUE_NEWS_DOMAINS = {
@@ -97,7 +94,6 @@ _MATERIAL_NEWS_HINTS = (
     "legal",
     "lawsuit",
     "antitrust",
-    "app store",
     "investigation",
     "ceo",
     "cfo",
@@ -110,9 +106,7 @@ _MATERIAL_NEWS_HINTS = (
     "capital return",
     "supply chain",
     "china",
-    "app store fee",
     "commission",
-    "developer fee",
     "acquires",
     "acquired",
 )
@@ -204,16 +198,13 @@ _EVENT_TOKEN_STOPWORDS = {
 }
 
 _EVENT_TOKEN_ALIASES = {
-    "app store": "app_store",
     "price target": "price_target",
     "capital return": "capital_return",
     "product launch": "product_launch",
     "supply chain": "supply_chain",
-    "final cut": "final_cut",
 }
 
 _EVENT_CLUSTER_HINTS = {
-    "app_store",
     "commission",
     "china",
     "antitrust",
@@ -229,16 +220,14 @@ _EVENT_CLUSTER_HINTS = {
     "ceo",
     "cfo",
     "interview",
-    "motionvfx",
 }
 
 _MANAGEMENT_TOPIC_HINTS = {
-    "interview": ("interview", "good morning america", "sunday morning", "abc news", "cbs"),
-    "anniversary": ("50th", "first 50 years", "anniversary", "party of one"),
+    "interview": ("interview",),
+    "anniversary": ("50th", "first 50 years", "anniversary"),
     "succession": ("retirement", "succession"),
     "tariffs": ("tariff", "refund"),
     "guidance": ("guidance", "forecast", "outlook"),
-    "ai": ("ai", "private cloud compute", "siri"),
 }
 
 
@@ -480,9 +469,7 @@ def _management_commentary_signature(item: dict) -> tuple[str | None, set[str]]:
     )
 
     speaker = None
-    if "tim cook" in text:
-        speaker = "tim_cook"
-    elif "ceo" in text:
+    if "ceo" in text:
         speaker = "ceo"
     elif "cfo" in text:
         speaker = "cfo"
