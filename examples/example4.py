@@ -1,4 +1,12 @@
-"""Example 4: interactive CLI for ad hoc finance-news and market-topic sentiment queries."""
+"""Example 4: interactive CLI for ad hoc finance-news and market-topic sentiment queries.
+
+Run with: uv run examples/example4.py
+Type any asset or market topic query at the prompt, for example:
+  - Latest news on gold
+  - Sentiment on Brazilian real
+  - What is the latest view on Colombia economy?
+Exit with Ctrl+C or type 'exit'.
+"""
 
 import os
 from textwrap import dedent
@@ -73,9 +81,11 @@ def build_agent() -> Agent:
 
 def main() -> None:
     agent = build_agent()
-    agent.cli_app(stream=True)
+    try:
+        agent.cli_app(stream=True)
+    except KeyboardInterrupt:
+        print("\nExiting.")
 
 
 if __name__ == "__main__":
     main()
-    
