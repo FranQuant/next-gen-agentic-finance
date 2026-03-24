@@ -1,6 +1,7 @@
 """Example 8: compact structured research handoff workflow."""
 
 import os
+from pathlib import Path
 from textwrap import dedent
 
 from dotenv import load_dotenv
@@ -20,18 +21,21 @@ from finance_tools import (
 load_dotenv()
 
 DEFAULT_MODEL_ID = os.getenv("EXAMPLE8_MODEL_ID", os.getenv("OPENAI_MODEL_ID", "gpt-5.4"))
-TEAM_DB_PATH = "tmp/research_team.db"
+TEAM_DB_PATH = Path(__file__).resolve().parents[1] / "tmp" / "research_team.db"
 
 
 def build_team() -> Team:
-    os.makedirs("tmp", exist_ok=True)
+    TEAM_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     db = SqliteDb(db_file=TEAM_DB_PATH)
-    model = OpenAIResponses(id=DEFAULT_MODEL_ID)
+    market_data_model = OpenAIResponses(id=DEFAULT_MODEL_ID)
+    research_interpreter_model = OpenAIResponses(id=DEFAULT_MODEL_ID)
+    open_questions_model = OpenAIResponses(id=DEFAULT_MODEL_ID)
+    team_model = OpenAIResponses(id=DEFAULT_MODEL_ID)
 
     market_data_agent = Agent(
         name="market-data-agent",
         role="Compact factual evidence-packet specialist",
-        model=model,
+        model=market_data_model,
         tools=[
             get_current_stock_price,
             get_company_info,
@@ -79,7 +83,7 @@ def build_team() -> Team:
     research_interpreter = Agent(
         name="research-interpreter",
         role="Bounded institutional research interpreter",
-        model=model,
+        model=research_interpreter_model,
         instructions=dedent("""
             You are a research interpreter.
 
@@ -124,7 +128,7 @@ def build_team() -> Team:
     open_questions_agent = Agent(
         name="open-questions-specialist",
         role="Diligence gaps and unresolved questions specialist",
-        model=model,
+        model=open_questions_model,
         instructions=dedent("""
             You are a diligence gaps specialist.
 
@@ -165,7 +169,7 @@ def build_team() -> Team:
 
     research_handoff_team = Team(
         name="Structured Research Handoff Team",
-        model=model,
+        model=team_model,
         members=[
             market_data_agent,
             research_interpreter,
