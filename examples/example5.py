@@ -1,6 +1,7 @@
 """Example 5: interactive LatAm stocks SQL agent over a local CSV dataset."""
 
 import os
+from pathlib import Path
 from textwrap import dedent
 
 from dotenv import load_dotenv
@@ -12,10 +13,11 @@ from agno.tools.csv_toolkit import CsvTools
 load_dotenv()
 
 MODEL_ID = os.getenv("EXAMPLE5_MODEL_ID", os.getenv("OPENAI_MODEL_ID", "gpt-5.4"))
+DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "latamstocks.csv"
 
 
 def build_agent() -> Agent:
-    csv_tool = CsvTools(csvs=["data/latamstocks.csv"])
+    csv_tool = CsvTools(csvs=[str(DATA_PATH)])
 
     return Agent(
         model=OpenAIResponses(id=MODEL_ID),
