@@ -1,136 +1,174 @@
-# Agentic Finance Examples
+# next-gen-agentic-finance
 
-A focused learning repository for agentic finance patterns: prompt engineering, live retrieval, retrieval debugging, interactive analyst workflows, structured data access, custom finance tools, multi-agent research orchestration, and structured research handoff design.
+**A progressive example series for Layer 1 agentic finance: AI-powered research intelligence, live retrieval, multi-agent orchestration, and structured monitoring workflows.**
 
-Built with:
+Built with Agno · OpenAI · Tavily · yfinance · Python 3.13
 
-- Agno agents and teams
-- OpenAI Responses models
-- Tavily web search
-- yfinance market data
-- local CSV / SQL-style querying for structured data examples
+---
+
+## Context
+
+The current frontier of applied AI in finance is **agentic research** — agents that retrieve live market intelligence, reason over it, and surface structured findings for human review. This is happening in production at major institutions today.
+
+This repository demonstrates that layer systematically, from a single prompt-only agent to multi-agent orchestration and issuer monitoring workflows. It is designed as **Layer 1 of a quant research stack**: intelligence gathering and synthesis that feeds human-supervised investment decisions.
+
+It is not a trading system, portfolio optimizer, or execution engine. Those layers are downstream — and they still require human oversight before any capital action is taken.
+
+---
 
 ## What this repository is / is not
 
 **What it is**
-- A focused educational demos repository for agentic finance patterns, covering prompt engineering, live retrieval, retrieval debugging, structured data access, custom finance tools, multi-agent orchestration, and structured research handoff.
-- Intended for learning, experimentation, and bounded prototype workflows.
+- A focused, progressive demo series covering the core patterns of agentic finance research
+- Designed to be readable, extensible, and honest about what agents can and cannot do reliably
+- A foundation layer: research intelligence designed to inform, not to act
 
 **What it is not**
-- Not a production research platform, live trading or execution system, portfolio optimizer, or OMS/EMS.
-- Not investment advice; `example7.py` and `example8.py` should be understood as bounded prototype workflows, not deployable PM infrastructure.
+- Not a production research platform, live trading system, or portfolio management tool
+- Not investment advice
+- Not a framework — it uses [Agno](https://github.com/agno-agi/agno) as the agent layer
 
-## 1. Setup
+---
 
-This repository expects **Python 3.13** and uses `uv` for environment and dependency management.
+## Stack
 
-Install `uv` if needed:
+| Component | Role |
+|---|---|
+| [Agno](https://github.com/agno-agi/agno) | Agent and multi-agent orchestration framework |
+| OpenAI (gpt-4o / o-series) | LLM backend via OpenAI Responses API |
+| [Tavily](https://tavily.com) | Live web and news retrieval |
+| yfinance | Market data, options chains, analyst recommendations |
+| DuckDB / CsvTools | SQL-style queries over local structured data |
+| MCP (remote) | Tavily via Model Context Protocol in example9 |
+
+---
+
+## Setup
+
+Requires **Python 3.13** and [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
+# Install uv if needed
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source "$HOME/.local/bin/env"
-uv --version
-```
 
-Create the environment and install dependencies:
-
-```bash
+# Clone and install
 git clone https://github.com/FranQuant/next-gen-agentic-finance.git
 cd next-gen-agentic-finance
 
 uv venv --python 3.13 .venv
 source .venv/bin/activate
 uv sync
-```
 
-Run the installation sanity check:
-
-```bash
+# Verify installation
 uv run examples/example0_setup_check.py
 ```
 
-## 2. Environment Variables
+---
 
-Copy the template:
+## Environment Variables
 
 ```bash
 cp .env.example .env
 ```
 
-Set the keys needed for the examples you want to run:
-
-- `OPENAI_API_KEY` — required for OpenAI-powered examples
-- `TAVILY_API_KEY` — required for web search and live news retrieval examples
-- `EXAMPLE9_TAVILY_MCP_URL` — required for `example9.py` remote Tavily MCP connection
-- `FRED_API_KEY` — optional for future macro-oriented demos if added later
-
-See `.env.example` for the current template and optional per-example model overrides.
-
-## 3. Example Guide
-
-| Example | Focus |
+| Variable | Required for |
 |---|---|
-| `example0_setup_check.py` | Minimal installation sanity check |
-| `example1.py` | Prompt-only baseline over static finance headlines |
-| `example2.py` | Tool-enabled live finance-news retrieval and sentiment scoring |
-| `example3.py` | Retrieval debug, traceability, and quality inspection |
-| `example4.py` | Interactive analyst console for ad hoc market-topic queries |
-| `example5.py` | Local CSV / SQL-style LatAm equities data agent |
-| `example6.py` | Custom finance tool example: options maximum pain |
-| `example7.py` | Clean multi-agent stock research orchestration |
-| `example8.py` | Compact structured research handoff |
-| `example9.py` | Agno + Tavily remote MCP issuer-intelligence demo |
+| `OPENAI_API_KEY` | All examples |
+| `TAVILY_API_KEY` | example2 – example4, example9, example10 |
+| `EXAMPLE9_TAVILY_MCP_URL` | example9 (remote MCP) |
+| `FRED_API_KEY` | Reserved for future macro examples |
 
-## 4. Progression
+See `.env.example` for per-example model override options.
 
-- `example0_setup_check.py` → environment sanity check
-- `example1.py` → prompt-only baseline
-- `example2.py` → first live retrieval workflow
-- `example3.py` → inspect and debug retrieval behavior
-- `example4.py` → turn retrieval into an interactive analyst workflow
-- `example5.py` → structured local data querying
-- `example6.py` → custom domain-specific finance tool
-- `example7.py` → first clean multi-agent research brief
-- `example8.py` → structured research handoff with explicit open questions and gaps
-- `example9.py` → issuer-intelligence workflow via Agno + Tavily remote MCP
+---
 
-## 5. Shared Utility Layer
+## Example Progression
 
-`examples/finance_tools.py` provides a lightweight shared tool layer used across multiple examples for market data, analyst context, company snapshots, and web/news retrieval.
+The series builds one concept at a time. Each example adds exactly one new pattern.
 
-It is a compact demo utility module, not a production SDK.
+| Example | Pattern | What it introduces |
+|---|---|---|
+| `example0_setup_check.py` | Sanity check | Verifies Agno installs correctly — no API calls |
+| `example1.py` | Prompt-only agent | Structured sentiment analysis over static headlines — no tools |
+| `example2.py` | Tool-enabled agent | Live news retrieval via Tavily + same sentiment rubric |
+| `example3.py` | Debug / inspection | `debug_mode=True` — how to inspect tool calls and retrieval quality |
+| `example4.py` | Interactive console | Turns the retrieval agent into an ad hoc analyst CLI |
+| `example5.py` | Structured data agent | SQL-style queries over a local LatAm equities CSV via DuckDB |
+| `example6.py` | Custom tool definition | Options max-pain computation: pure function → `@tool` → agent |
+| `example7.py` | Multi-agent team | 3-agent research brief: market data → company info → orchestrator |
+| `example8.py` | Structured handoff | Evidence packet → interpretation → open questions; explicit gap tracking |
+| `example9.py` | Remote MCP | Issuer intelligence via Agno + Tavily over async MCP transport |
+| `example10.py` | Watchlist monitoring | Load and validate a ticker watchlist → retrieve developments → structured alert report |
 
-## 6. Current Repository Structure
+### The learning arc
+
+```
+ex0–1   Static prompts, no tools          → understand the baseline
+ex2–4   Live retrieval, debug, interactive → add tools, inspect behavior
+ex5–6   Structured data + custom tools    → connect agents to real data sources
+ex7–8   Multi-agent orchestration         → coordinate specialist agents with JSON handoffs
+ex9–10  MCP + monitoring workflows        → production-adjacent patterns with validation
+```
+
+---
+
+## Shared Tool Layer
+
+`examples/finance_tools.py` provides the shared finance utility functions used across examples:
+
+- `get_current_stock_price` — price, OHLCV, session timing
+- `get_analyst_recommendations` — buy/hold/sell counts, price targets
+- `get_company_info` — sector, fundamentals, valuation ratios
+- `get_company_news` — yfinance news feed
+- `get_company_news_tavily` — deduplicated, quality-scored news via 4 parallel Tavily queries
+
+This is a demo utility module. It is not a production SDK.
+
+---
+
+## Repository Structure
 
 ```text
 next-gen-agentic-finance/
 ├── data/
+│   └── latamstocks.csv          # LatAm equities dataset (example5)
 ├── examples/
+│   ├── finance_tools.py         # Shared tool layer
 │   ├── example0_setup_check.py
-│   ├── example1.py
-│   ├── example2.py
-│   ├── example3.py
-│   ├── example4.py
-│   ├── example5.py
-│   ├── example6.py
-│   ├── example7.py
-│   ├── example8.py
-│   ├── example9.py
-│   └── finance_tools.py
+│   ├── example1.py  →  example10.py
 ├── README.md
 ├── pyproject.toml
 └── uv.lock
 ```
 
-## 7. Where to Start
+---
 
-- Run `example0_setup_check.py` first.
-- Then go in order from `example1.py` upward.
-- Use `example3.py` when you want to inspect live retrieval behavior.
-- Use `example5.py` and `example6.py` to see structured-data and custom-tool patterns.
-- Use `example7.py` and `example8.py` for the more advanced multi-agent workflows.
-- Use `example9.py` for a bounded issuer-intelligence demo using Agno with Tavily remote MCP.
+## Where to Start
+
+Run `example0_setup_check.py` first, then go in order. The progression is intentional — each example assumes familiarity with the one before it.
+
+If you want to jump to a specific pattern:
+- **Custom tool design** → `example6.py`
+- **Multi-agent orchestration** → `example7.py`
+- **MCP integration** → `example9.py`
+- **Watchlist monitoring** → `example10.py`
+
+---
+
+## Roadmap
+
+Patterns under consideration for future examples:
+
+- Pydantic-validated structured output (replacing natural language output constraints)
+- Async parallel tool execution
+- Agent error recovery and tool fallback patterns
+- Evaluation and testing of agent outputs
+- Earnings call transcript analysis
+- Macro indicator retrieval (FRED)
+
+---
 
 ## Disclaimer
 
-This repository is for research and educational use only. Nothing in this codebase or its outputs constitutes investment advice.
+This repository is for research and educational purposes only. Nothing in this codebase or its outputs constitutes investment advice. All examples are bounded demonstrations — not deployable investment infrastructure.

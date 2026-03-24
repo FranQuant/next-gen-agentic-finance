@@ -1,7 +1,0 @@
-ticker,name,weight,thesis,risk_bucket,region,priority,notes
-AAPL,Apple Inc,0.18,Consumer platform and installed-base monetization,Medium,US,1,"Monitor device demand, services mix, regulatory pressure, and supply chain developments."
-MSFT,Microsoft Corp,0.20,Enterprise software and AI platform leader,Medium,US,1,"Monitor Azure growth, AI monetization, capex discipline, and enterprise demand."
-NVDA,NVIDIA Corp,0.18,AI infrastructure and accelerator leader,High,US,1,"Monitor hyperscaler demand, product roadmap, export controls, and competitive dynamics."
-AMZN,Amazon.com Inc,0.16,E-commerce and cloud platform with operating leverage,Medium,US,2,"Monitor AWS trends, retail margins, logistics efficiency, and AI-related capex."
-JPM,JPMorgan Chase & Co,0.14,Systemically important bank with diversified earnings base,Medium,US,2,"Monitor NII trajectory, credit quality, capital returns, and regulatory developments."
-META,Meta Platforms Inc,0.14,Digital advertising and AI-driven platform monetization,Medium,US,2,"Monitor ad demand, engagement trends, AI monetization, capex discipline, and regulatory pressure."
