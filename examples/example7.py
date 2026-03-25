@@ -50,7 +50,7 @@ def build_team() -> Team:
     db = None
     if ENABLE_DB:
         TEAM_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        db = SqliteDb(db_file=TEAM_DB_PATH)
+        db = SqliteDb(db_file=str(TEAM_DB_PATH))
 
     team_tools = []
     if ENABLE_REASONING:

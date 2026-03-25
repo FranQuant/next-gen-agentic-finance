@@ -1,6 +1,6 @@
 # next-gen-agentic-finance
 
-**A progressive example series for Layer 1 agentic finance: AI-powered research intelligence, live retrieval, multi-agent orchestration, and structured monitoring workflows.**
+**A progressive example series for Layer 1 agentic finance: AI-powered research intelligence, live retrieval, multi-agent orchestration, and MCP-based issuer intelligence.**
 
 Built with Agno · OpenAI · Tavily · yfinance · Python 3.13
 
@@ -10,7 +10,7 @@ Built with Agno · OpenAI · Tavily · yfinance · Python 3.13
 
 The current frontier of applied AI in finance is **agentic research** — agents that retrieve live market intelligence, reason over it, and surface structured findings for human review. This is happening in production at major institutions today.
 
-This repository demonstrates that layer systematically, from a single prompt-only agent to multi-agent orchestration and issuer monitoring workflows. It is designed as **Layer 1 of a quant research stack**: intelligence gathering and synthesis that feeds human-supervised investment decisions.
+This repository demonstrates that layer systematically, from a single prompt-only agent to multi-agent orchestration and remote MCP-based issuer intelligence. It is designed as **Layer 1 of a quant research stack**: intelligence gathering and synthesis that feeds human-supervised investment decisions.
 
 It is not a trading system, portfolio optimizer, or execution engine. Those layers are downstream — and they still require human oversight before any capital action is taken.
 

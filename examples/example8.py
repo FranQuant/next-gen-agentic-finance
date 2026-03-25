@@ -26,7 +26,7 @@ TEAM_DB_PATH = Path(__file__).resolve().parents[1] / "tmp" / "research_team.db"
 
 def build_team() -> Team:
     TEAM_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    db = SqliteDb(db_file=TEAM_DB_PATH)
+    db = SqliteDb(db_file=str(TEAM_DB_PATH))
     market_data_model = OpenAIResponses(id=DEFAULT_MODEL_ID)
     research_interpreter_model = OpenAIResponses(id=DEFAULT_MODEL_ID)
     open_questions_model = OpenAIResponses(id=DEFAULT_MODEL_ID)
