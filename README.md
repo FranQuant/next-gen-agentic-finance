@@ -75,7 +75,7 @@ cp .env.example .env
 | Variable | Required for |
 |---|---|
 | `OPENAI_API_KEY` | All examples |
-| `TAVILY_API_KEY` | example2 – example4, example9, example10 |
+| `TAVILY_API_KEY` | example2 – example4, example9 |
 | `EXAMPLE9_TAVILY_MCP_URL` | example9 (remote MCP) |
 | `FRED_API_KEY` | Reserved for future macro examples |
 
@@ -99,7 +99,6 @@ The series builds one concept at a time. Each example adds exactly one new patte
 | `example7.py` | Multi-agent team | 3-agent research brief: market data → company info → orchestrator |
 | `example8.py` | Structured handoff | Evidence packet → interpretation → open questions; explicit gap tracking |
 | `example9.py` | Remote MCP | Issuer intelligence via Agno + Tavily over async MCP transport |
-| `example10.py` | Watchlist monitoring | Load and validate a ticker watchlist → retrieve developments → structured alert report |
 
 ### The learning arc
 
@@ -108,7 +107,7 @@ ex0–1   Static prompts, no tools          → understand the baseline
 ex2–4   Live retrieval, debug, interactive → add tools, inspect behavior
 ex5–6   Structured data + custom tools    → connect agents to real data sources
 ex7–8   Multi-agent orchestration         → coordinate specialist agents with JSON handoffs
-ex9–10  MCP + monitoring workflows        → production-adjacent patterns with validation
+ex9     MCP + async transport             → production-adjacent retrieval patterns
 ```
 
 ---
@@ -121,7 +120,7 @@ ex9–10  MCP + monitoring workflows        → production-adjacent patterns wit
 - `get_analyst_recommendations` — buy/hold/sell counts, price targets
 - `get_company_info` — sector, fundamentals, valuation ratios
 - `get_company_news` — yfinance news feed
-- `get_company_news_tavily` — deduplicated, quality-scored news via 4 parallel Tavily queries
+- `get_company_news_tavily` — deduplicated, quality-scored news via 4 sequential Tavily queries
 
 This is a demo utility module. It is not a production SDK.
 
@@ -136,7 +135,7 @@ next-gen-agentic-finance/
 ├── examples/
 │   ├── finance_tools.py         # Shared tool layer
 │   ├── example0_setup_check.py
-│   ├── example1.py  →  example10.py
+│   ├── example1.py  →  example9.py
 ├── README.md
 ├── pyproject.toml
 └── uv.lock
@@ -152,20 +151,6 @@ If you want to jump to a specific pattern:
 - **Custom tool design** → `example6.py`
 - **Multi-agent orchestration** → `example7.py`
 - **MCP integration** → `example9.py`
-- **Watchlist monitoring** → `example10.py`
-
----
-
-## Roadmap
-
-Patterns under consideration for future examples:
-
-- Pydantic-validated structured output (replacing natural language output constraints)
-- Async parallel tool execution
-- Agent error recovery and tool fallback patterns
-- Evaluation and testing of agent outputs
-- Earnings call transcript analysis
-- Macro indicator retrieval (FRED)
 
 ---
 
