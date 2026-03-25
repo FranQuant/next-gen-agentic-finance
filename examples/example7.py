@@ -64,6 +64,7 @@ def build_team() -> Team:
         model=OpenAIResponses(id=STOCK_SEARCHER_MODEL_ID),
         role="Retrieves factual market data and analyst-positioning context only.",
         tools=[get_current_stock_price, get_analyst_recommendations],
+        show_tool_calls=True,
         instructions=dedent("""\
             You are the market-data and analyst-positioning specialist.
 
@@ -126,6 +127,7 @@ def build_team() -> Team:
         model=OpenAIResponses(id=COMPANY_INFO_MODEL_ID),
         role="Retrieves company fundamentals and evaluates recent company-news quality.",
         tools=[get_company_info, get_company_news_tavily],
+        show_tool_calls=True,
         instructions=dedent("""\
             You are the fundamentals and company-news specialist.
 

@@ -727,7 +727,15 @@ def _select_preferred_news_item(existing: dict, candidate: dict) -> dict:
 
 @tool
 def get_current_stock_price(symbol: str) -> dict:
-    """Return the latest available Yahoo history-based market snapshot, not a guaranteed real-time price."""
+    """Return the latest available Yahoo history-based market snapshot, not a guaranteed real-time price.
+
+    Args:
+        symbol: stock ticker symbol (e.g. AAPL)
+
+    Returns:
+        dict with keys: symbol, ok, price, open, day_high, day_low, volume,
+        previous_close, as_of, history_period, source. On failure: symbol, ok, error.
+    """
     symbol = _normalize_symbol(symbol)
 
     try:
@@ -759,7 +767,15 @@ def get_current_stock_price(symbol: str) -> dict:
 
 @tool
 def get_analyst_recommendations(symbol: str) -> dict:
-    """Return recent Yahoo analyst recommendation records, not a definitive consensus engine."""
+    """Return recent Yahoo analyst recommendation records, not a definitive consensus engine.
+
+    Args:
+        symbol: stock ticker symbol (e.g. AAPL)
+
+    Returns:
+        dict with keys: symbol, ok, analyst_recommendations (list of period-level count
+        records), record_count, source. On failure: symbol, ok, error.
+    """
     symbol = _normalize_symbol(symbol)
 
     try:
@@ -793,7 +809,16 @@ def get_analyst_recommendations(symbol: str) -> dict:
 
 @tool
 def get_company_info(symbol: str) -> dict:
-    """Return a curated Yahoo company snapshot, not a clean audited fundamentals API."""
+    """Return a curated Yahoo company snapshot, not a clean audited fundamentals API.
+
+    Args:
+        symbol: stock ticker symbol (e.g. AAPL)
+
+    Returns:
+        dict with keys: symbol, ok, company_info (curated subset of yfinance .info
+        fields covering identity, fundamentals, valuation, and targets). On failure:
+        symbol, ok, error.
+    """
     symbol = _normalize_symbol(symbol)
 
     try:
