@@ -18,8 +18,19 @@ load_dotenv()
 MODEL_ID = os.getenv("EXAMPLE6_MODEL_ID", os.getenv("OPENAI_MODEL_ID", "gpt-5.4"))
 
 
-def compute_max_pain_from_chain(calls: pd.DataFrame, puts: pd.DataFrame) -> float:
+def compute_max_pain_from_chain(calls: pd.DataFrame, puts: pd.DataFrame) -> float | str:
     """Deterministic maximum-pain calculation from calls and puts open interest."""
+    required = {"strike", "openInterest"}
+    missing_calls = required - set(calls.columns)
+    missing_puts = required - set(puts.columns)
+    if missing_calls or missing_puts:
+        parts = []
+        if missing_calls:
+            parts.append(f"calls missing columns: {sorted(missing_calls)}")
+        if missing_puts:
+            parts.append(f"puts missing columns: {sorted(missing_puts)}")
+        return "Cannot compute max pain — " + "; ".join(parts) + "."
+
     calls = calls[["strike", "openInterest"]].copy()
     puts = puts[["strike", "openInterest"]].copy()
 
@@ -69,6 +80,9 @@ def maximum_pain_level(symbol: str, expiration: str) -> str:
         return f"No options data available for {symbol} on {expiration}."
 
     max_pain_strike = compute_max_pain_from_chain(calls, puts)
+
+    if isinstance(max_pain_strike, str):
+        return max_pain_strike
 
     return f"Maximum pain strike for {symbol} on {expiration}: {max_pain_strike}"
 
