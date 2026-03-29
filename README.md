@@ -134,6 +134,7 @@ next-gen-agentic-finance/
 │   └── latamstocks.csv          # LatAm equities dataset (example5)
 ├── examples/
 │   ├── finance_tools.py         # Shared tool layer
+│   ├── news_filter.py           # News scoring and filtering logic
 │   ├── example0_setup_check.py
 │   ├── example1.py  →  example9.py
 ├── README.md
