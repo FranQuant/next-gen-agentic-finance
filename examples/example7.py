@@ -17,15 +17,19 @@ ENABLE_REASONING = _env_flag("EXAMPLE7_ENABLE_REASONING")
 SHOW_FULL_REASONING = _env_flag("EXAMPLE7_SHOW_REASONING")
 ENABLE_DB = _env_flag("EXAMPLE7_ENABLE_DB")
 
+try:
+    from agno.db.sqlite import SqliteDb
+except ImportError:
+    SqliteDb = None  # type: ignore[assignment,misc]
+
+try:
+    from agno.tools.reasoning import ReasoningTools
+except ImportError:
+    ReasoningTools = None  # type: ignore[assignment,misc]
+
 from agno.agent import Agent
 from agno.models.openai import OpenAIResponses
 from agno.team import Team
-
-if ENABLE_DB:
-    from agno.db.sqlite import SqliteDb
-
-if ENABLE_REASONING:
-    from agno.tools.reasoning import ReasoningTools
 
 from finance_tools import (
     get_analyst_recommendations,

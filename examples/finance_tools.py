@@ -26,52 +26,38 @@ _COMPANY_NAME_STOPWORDS = {
     "the",
 }
 
-_PREFERRED_NEWS_DOMAINS = {
-    "reuters.com",
-    "bloomberg.com",
-    "wsj.com",
-    "ft.com",
-    "cnbc.com",
-    "apnews.com",
-    "finance.yahoo.com",
-    "sec.gov",
-}
-
-_EVENT_NEWS_DOMAINS = {
-    "techcrunch.com",
-    "theguardian.com",
-    "theverge.com",
-}
-
-_LOW_VALUE_NEWS_DOMAINS = {
-    "fool.com",
-    "investorplace.com",
-    "247wallst.com",
-    "marketbeat.com",
-    "etfdailynews.com",
-    "defenseworld.net",
-    "americanbankingnews.com",
-    "stockanalysis.com",
-    "tipranks.com",
-    "barchart.com",
-    "simplywall.st",
-    "markets.financialcontent.com",
-}
-
-_COMMENTARY_NEWS_DOMAINS = {
-    "seekingalpha.com",
-    "tipranks.com",
-    "fool.com",
-    "investorplace.com",
-    "marketbeat.com",
-    "stockanalysis.com",
-    "simplywall.st",
-    "barchart.com",
-}
-
-_PR_AGGREGATOR_NEWS_DOMAINS = {
-    "stocktitan.net",
-    "mexc.com",
+_DOMAIN_SCORES: dict[str, float] = {
+    # preferred +2.0
+    "reuters.com": 2.0,
+    "bloomberg.com": 2.0,
+    "wsj.com": 2.0,
+    "ft.com": 2.0,
+    "cnbc.com": 2.0,
+    "apnews.com": 2.0,
+    "finance.yahoo.com": 2.0,
+    "sec.gov": 2.0,
+    # event +1.0
+    "techcrunch.com": 1.0,
+    "theguardian.com": 1.0,
+    "theverge.com": 1.0,
+    # low_value -2.5
+    "247wallst.com": -2.5,
+    "etfdailynews.com": -2.5,
+    "defenseworld.net": -2.5,
+    "americanbankingnews.com": -2.5,
+    "markets.financialcontent.com": -2.5,
+    # commentary -4.0 (wins over low_value for overlapping domains)
+    "seekingalpha.com": -4.0,
+    "tipranks.com": -4.0,
+    "fool.com": -4.0,
+    "investorplace.com": -4.0,
+    "marketbeat.com": -4.0,
+    "stockanalysis.com": -4.0,
+    "simplywall.st": -4.0,
+    "barchart.com": -4.0,
+    # pr_aggregator -5.0
+    "stocktitan.net": -5.0,
+    "mexc.com": -5.0,
 }
 
 _MATERIAL_NEWS_HINTS = (
@@ -352,17 +338,7 @@ def _normalize_title_key(title: str | None) -> str | None:
 
 def _source_preference_score(url: str | None) -> float:
     domain = _domain_key(url)
-    if domain in _PREFERRED_NEWS_DOMAINS:
-        return 2.0
-    if domain in _EVENT_NEWS_DOMAINS:
-        return 1.0
-    if domain in _PR_AGGREGATOR_NEWS_DOMAINS:
-        return -5.0
-    if domain in _COMMENTARY_NEWS_DOMAINS:
-        return -4.0
-    if domain in _LOW_VALUE_NEWS_DOMAINS:
-        return -2.5
-    return 0.0
+    return _DOMAIN_SCORES.get(domain, 0.0)
 
 
 def _build_company_terms(symbol: str, company_name: str) -> tuple[set[str], str | None]:
@@ -546,8 +522,6 @@ def _select_diverse_news_items(ranked_items: list[dict], num_stories: int, compa
         if require_new_category and item.get("query_category") in used_categories:
             return False
         if same_category_items and any(_is_similar_event(item, chosen, company_terms) for chosen in same_category_items):
-            if item.get("query_category") == "management_commentary" and item.get("_ranking_score", 0.0) >= 1.0:
-                return False
             return False
         if avoid_similar_event and similar_to_selected:
             return False
@@ -651,8 +625,8 @@ def _score_tavily_news_item(
     weak_pattern = weak_hits > 0
     excluded_pattern = any(hint in text for hint in _EXCLUDED_NEWS_HINTS)
     domain_source_score = _source_preference_score(item.get("url"))
-    commentary_domain = domain in _COMMENTARY_NEWS_DOMAINS
-    pr_aggregator_domain = domain in _PR_AGGREGATOR_NEWS_DOMAINS
+    commentary_domain = _DOMAIN_SCORES.get(domain, 0.0) == -4.0
+    pr_aggregator_domain = _DOMAIN_SCORES.get(domain, 0.0) == -5.0
     age_days = _news_age_days(item.get("date"))
 
     score = _to_float_or_none(item.get("score")) or 0.0
@@ -692,10 +666,10 @@ def _score_tavily_news_item(
     if weak_hits >= 2 and material_hits == 0:
         return score, "excluded", "weak_generic"
 
-    if weak_pattern and domain in _LOW_VALUE_NEWS_DOMAINS and material_hits <= 1:
+    if weak_pattern and _DOMAIN_SCORES.get(domain, 0.0) == -2.5 and material_hits <= 1:
         return score, "excluded", "weak_generic"
 
-    if weak_pattern or commentary_domain or domain in _LOW_VALUE_NEWS_DOMAINS:
+    if weak_pattern or commentary_domain or _DOMAIN_SCORES.get(domain, 0.0) == -2.5:
         bucket = "weak_or_generic"
     elif strong_name_match or symbol_match or len(matched_terms) >= 2 or material_hits:
         bucket = "high_confidence_company_specific"
