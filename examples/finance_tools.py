@@ -5,11 +5,8 @@ import re
 from urllib.parse import urlparse
 
 from agno.tools import tool
-from dotenv import load_dotenv
 from tavily import TavilyClient
 import yfinance as yf
-
-load_dotenv()
 
 _COMPANY_NAME_STOPWORDS = {
     "inc",
@@ -860,6 +857,8 @@ def get_company_info(symbol: str) -> dict:
             "dividendRate": info.get("dividendRate"),
             "dividendYield": info.get("dividendYield"),
             "payoutRatio": info.get("payoutRatio"),
+            "fiftyTwoWeekHigh": info.get("fiftyTwoWeekHigh"),
+            "fiftyTwoWeekLow": info.get("fiftyTwoWeekLow"),
         }
 
         normalized = {key: _to_builtin(value) for key, value in curated.items()}
