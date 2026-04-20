@@ -1,14 +1,13 @@
 [project]
 name = "nextgen-agentic-finance"
 version = "0.1.0"
-description = "Focused learning examples for agentic finance workflows, including retrieval, structured data, custom tools, and multi-agent research handoff."
+description = "Layer 1 examples for public/demo-data retrieval, bounded synthesis, and structured handoffs."
 readme = "README.md"
 requires-python = ">=3.13"
 
 dependencies = [
     "agno>=2.3.8",
     "duckdb>=1.4.1",
-    "mcp>=1.19.0",
     "numpy>=2.0",
     "openai>=2.3.0",
     "pandas>=2.3.3",
@@ -16,6 +15,11 @@ dependencies = [
     "python-dotenv>=1.0",
     "tavily-python>=0.7.21",
     "yfinance>=0.2",
+]
+
+[project.optional-dependencies]
+example9 = [
+    "mcp>=1.19.0",
 ]
 
 [dependency-groups]

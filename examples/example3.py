@@ -1,16 +1,12 @@
-"""Example 3: debug/inspection variant — how to read agent internals.
+"""Example 3: debug/inspection variant of the Tavily retrieval agent.
 
-Run this example and observe the debug output. Key things to look for:
+Run this example and inspect the debug output. It can help you review the
+prompt sent to the model, tool calls, token/tool metrics, and cached context.
+The exact debug trace can vary by run, model, tool behavior, and framework
+version.
 
-- system block: the exact prompt sent to the model, including tool definitions
-- Tool Calls: the agent autonomously chose site: search operators — not instructed
-- METRICS per step: token consumption grows as context accumulates across tool calls
-- cached= tokens: shows context reuse across multiple tool calls in the same run
-- Tool Duration: each Tavily call takes 3-5s — sequential, not parallel
-- The final METRICS block shows total tokens for the full run
-
-debug_mode=True is the only change from example2.py.
-Use it whenever you need to diagnose unexpected tool behavior or output quality.
+Use this variant whenever you need to diagnose unexpected tool behavior or
+output quality.
 """
 
 import os

@@ -44,7 +44,7 @@ It is intentionally limited in scope: it is not a full research stack, not a bac
 | [Tavily](https://tavily.com) | Live web and news retrieval |
 | yfinance | Market data, company fundamentals, analyst recommendation records, and options chains |
 | DuckDB / CsvTools | SQL-style queries over local structured data |
-| MCP (remote) | Tavily via Model Context Protocol in `example9.py` |
+| MCP (optional) | Remote Tavily transport used only by `example9.py` |
 
 ---
 
@@ -65,6 +65,9 @@ uv venv --python 3.13 .venv
 source .venv/bin/activate
 uv sync
 
+# Optional: install the adjacent MCP demo extra for example9
+uv sync --extra example9
+
 # Verify installation
 uv run examples/example0_setup_check.py
 ```
@@ -79,10 +82,9 @@ cp .env.example .env
 
 | Variable | Required for |
 |---|---|
-| `OPENAI_API_KEY` | All examples |
-| `TAVILY_API_KEY` | example2 – example4, example7 – example9 |
+| `OPENAI_API_KEY` | examples 1–9 |
+| `TAVILY_API_KEY` | examples 2–4 and 7–9 |
 | `EXAMPLE9_TAVILY_MCP_URL` | example9 (remote MCP) |
-| `FRED_API_KEY` | Reserved for future macro examples |
 
 See `.env.example` for per-example model override options.
 
@@ -160,7 +162,7 @@ If you want to jump to a specific pattern:
 - **Canonical structured handoff** → `example8.py`
 - **Bridge into multi-agent orchestration** → `example7.py`
 - **Custom tool design** → `example6.py`
-- **MCP integration** → `example9.py`
+- **Adjacent MCP demo** → `example9.py`
 
 ---
 

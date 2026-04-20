@@ -598,7 +598,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "agno" },
     { name = "duckdb" },
-    { name = "mcp" },
     { name = "numpy" },
     { name = "openai" },
     { name = "pandas" },
@@ -608,6 +607,11 @@ dependencies = [
     { name = "yfinance" },
 ]
 
+[package.optional-dependencies]
+example9 = [
+    { name = "mcp" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
@@ -615,9 +619,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agno", specifier = ">=2.1.4" },
+    { name = "agno", specifier = ">=2.3.8" },
     { name = "duckdb", specifier = ">=1.4.1" },
-    { name = "mcp", specifier = ">=1.19.0" },
+    { name = "mcp", marker = "extra == 'example9'", specifier = ">=1.19.0" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "openai", specifier = ">=2.3.0" },
     { name = "pandas", specifier = ">=2.3.3" },
@@ -626,6 +630,7 @@ requires-dist = [
     { name = "tavily-python", specifier = ">=0.7.21" },
     { name = "yfinance", specifier = ">=0.2" },
 ]
+provides-extras = ["example9"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.0.2" }]
