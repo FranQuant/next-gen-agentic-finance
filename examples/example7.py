@@ -53,11 +53,19 @@ DEMO_PROMPT = (
 def build_team() -> Team:
     db = None
     if ENABLE_DB:
+        if SqliteDb is None:
+            raise RuntimeError(
+                "SQLite/SQLAlchemy support is unavailable. Install `sqlalchemy` and rerun this example."
+            )
         TEAM_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         db = SqliteDb(db_file=str(TEAM_DB_PATH))
 
     team_tools = []
     if ENABLE_REASONING:
+        if ReasoningTools is None:
+            raise RuntimeError(
+                "Reasoning-tool support is unavailable. Install or upgrade `agno` and rerun this example."
+            )
         team_tools.append(ReasoningTools(add_instructions=True))
 
     # ============================================================
