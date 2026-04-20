@@ -7,12 +7,17 @@ from tavily import TavilyClient
 import yfinance as yf
 
 from news_filter import (
-    _build_company_terms,
-    _parse_news_datetime,
-    _score_tavily_news_item,
-    _select_diverse_news_items,
-    _select_preferred_news_item,
+    NEWS_FILTER_POLICY_VERSION,
+    build_company_terms,
+    parse_news_datetime,
+    score_tavily_news_item,
+    select_diverse_news_items,
+    select_preferred_news_item,
 )
+
+NEWS_QUERY_WINDOW_DAYS = 30
+NEWS_QUERY_MIN_RESULTS_PER_QUERY = 2
+NEWS_QUERY_MAX_RESULTS_PER_QUERY = 3
 
 
 def _normalize_symbol(symbol: str) -> str:
@@ -181,6 +186,8 @@ def get_analyst_recommendations(symbol: str) -> dict:
 
     try:
         ticker = yf.Ticker(symbol)
+        # Yahoo's recommendations surface is record-oriented and may be sparse,
+        # delayed, or empty depending on the symbol.
         recs = ticker.recommendations
 
         if recs is None or recs.empty:
@@ -217,13 +224,15 @@ def get_company_info(symbol: str) -> dict:
 
     Returns:
         dict with keys: symbol, ok, company_info (curated subset of yfinance .info
-        fields covering identity, fundamentals, valuation, and targets). On failure:
+        fields covering identity, fundamentals, valuation, and targets). Yahoo's
+        .info surface is best-effort and may disagree across symbols or sessions. On failure:
         symbol, ok, error.
     """
     symbol = _normalize_symbol(symbol)
 
     try:
         ticker = yf.Ticker(symbol)
+        # Yahoo's .info surface is a curated snapshot, not a schema-stable feed.
         info = ticker.info or {}
 
         curated = {
@@ -347,6 +356,15 @@ def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: in
     """Return normalized recent company news search results from Tavily."""
     symbol = _normalize_symbol(symbol)
     company_name = _clean_text(company_name) or ""
+    max_results_per_query = max(
+        NEWS_QUERY_MIN_RESULTS_PER_QUERY,
+        min(num_stories, NEWS_QUERY_MAX_RESULTS_PER_QUERY),
+    )
+    packet_metadata = {
+        "policy_version": NEWS_FILTER_POLICY_VERSION,
+        "query_window_days": NEWS_QUERY_WINDOW_DAYS,
+        "max_results_per_query": max_results_per_query,
+    }
 
     api_key = os.getenv("TAVILY_API_KEY")
     if not api_key:
@@ -354,10 +372,10 @@ def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: in
             "symbol": symbol,
             "ok": False,
             "error": "TAVILY_API_KEY not set.",
+            **packet_metadata,
         }
 
     company_label = f"{company_name} ({symbol})" if company_name else symbol
-    max_results_per_query = max(2, min(num_stories, 3))
     queries = [
         {
             "query_category": "broad_company_news",
@@ -379,7 +397,7 @@ def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: in
 
     try:
         client = TavilyClient(api_key=api_key)
-        company_terms, company_phrase = _build_company_terms(symbol, company_name)
+        company_terms, company_phrase = build_company_terms(symbol, company_name)
 
         collected = []
         excluded_count = 0
@@ -391,7 +409,7 @@ def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: in
                 response = client.search(
                     query=query_info["query"],
                     topic="news",
-                    days=30,
+                    days=NEWS_QUERY_WINDOW_DAYS,
                     max_results=max_results_per_query,
                     include_raw_content=False,
                 )
@@ -424,19 +442,21 @@ def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: in
                     "query_category": query_info["query_category"],
                 }
 
-                ranking_score, relevance_bucket, exclusion_reason = _score_tavily_news_item(
+                scoring = score_tavily_news_item(
                     normalized,
                     symbol=symbol,
                     company_terms=company_terms,
                     company_phrase=company_phrase,
                 )
 
-                if exclusion_reason is not None:
+                if scoring["exclusion_reason"] is not None:
                     excluded_count += 1
                     continue
 
-                normalized["relevance_bucket"] = relevance_bucket
-                normalized["_ranking_score"] = ranking_score
+                normalized["relevance_bucket"] = scoring["bucket"]
+                normalized["_ranking_score"] = scoring["score"]
+                if isinstance(scoring.get("reason_summary"), dict):
+                    normalized["reason_summary"] = scoring["reason_summary"]
                 collected.append(normalized)
 
         if not collected and len(query_failures) == len(queries):
@@ -448,6 +468,7 @@ def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: in
                 "query_used": queries[0]["query"],
                 "query_failures": query_failures,
                 "source": "Tavily news search (multi-query)",
+                **packet_metadata,
             }
 
         deduped_items = {}
@@ -464,7 +485,7 @@ def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: in
 
             if existing_key is not None:
                 deduped_count += 1
-                deduped_items[existing_key] = _select_preferred_news_item(
+                deduped_items[existing_key] = select_preferred_news_item(
                     deduped_items[existing_key],
                     item,
                 )
@@ -482,12 +503,12 @@ def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: in
                 item.get("relevance_bucket") == "high_confidence_company_specific",
                 item.get("relevance_bucket") == "broader_context",
                 item.get("_ranking_score", 0.0),
-                _parse_news_datetime(item.get("date")) or datetime.min.replace(tzinfo=timezone.utc),
+                parse_news_datetime(item.get("date")) or datetime.min.replace(tzinfo=timezone.utc),
             ),
             reverse=True,
         )
 
-        selected = _select_diverse_news_items(ranked_items, num_stories, company_terms)
+        selected = select_diverse_news_items(ranked_items, num_stories, company_terms)
 
         high_confidence_count = sum(
             1 for item in selected if item.get("relevance_bucket") == "high_confidence_company_specific"
@@ -511,18 +532,20 @@ def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: in
 
         normalized = []
         for item in selected:
-            normalized.append(
-                {
-                    "title": item.get("title"),
-                    "publisher": item.get("publisher"),
-                    "date": item.get("date"),
-                    "url": item.get("url"),
-                    "snippet": item.get("snippet"),
-                    "score": item.get("score"),
-                    "query_category": item.get("query_category"),
-                    "relevance_bucket": item.get("relevance_bucket"),
-                }
-            )
+            entry = {
+                "title": item.get("title"),
+                "publisher": item.get("publisher"),
+                "date": item.get("date"),
+                "url": item.get("url"),
+                "snippet": item.get("snippet"),
+                "score": item.get("score"),
+                "query_category": item.get("query_category"),
+                "relevance_bucket": item.get("relevance_bucket"),
+            }
+            reason_summary = item.get("reason_summary")
+            if isinstance(reason_summary, dict):
+                entry["reason_summary"] = reason_summary
+            normalized.append(entry)
 
         return {
             "symbol": symbol,
@@ -536,6 +559,7 @@ def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: in
             "news_quality_note": news_quality_note,
             "event_diversity_note": f"Selected {len(normalized)} items across {distinct_categories} query categories.",
             "source": "Tavily news search (multi-query)",
+            **packet_metadata,
             **({"query_failures": query_failures} if query_failures else {}),
         }
     except Exception as e:
@@ -545,4 +569,5 @@ def get_company_news_tavily(symbol: str, company_name: str = "", num_stories: in
             "error": str(e),
             "queries_used": queries,
             "query_used": queries[0]["query"],
+            **packet_metadata,
         }

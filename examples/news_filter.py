@@ -3,7 +3,11 @@ from email.utils import parsedate_to_datetime
 import re
 from urllib.parse import urlparse
 
-_COMPANY_NAME_STOPWORDS = {
+# Intentional policy surface for the evidence layer.
+NEWS_FILTER_POLICY_VERSION = "v1"
+
+# Company identity normalization policy.
+COMPANY_NAME_STOPWORDS = {
     "inc",
     "incorporated",
     "corp",
@@ -21,8 +25,8 @@ _COMPANY_NAME_STOPWORDS = {
     "the",
 }
 
-_DOMAIN_SCORES: dict[str, float] = {
-    # preferred +2.0
+# Source preference policy.
+SOURCE_DOMAIN_PREFERENCES: dict[str, float] = {
     "reuters.com": 2.0,
     "bloomberg.com": 2.0,
     "wsj.com": 2.0,
@@ -31,17 +35,14 @@ _DOMAIN_SCORES: dict[str, float] = {
     "apnews.com": 2.0,
     "finance.yahoo.com": 2.0,
     "sec.gov": 2.0,
-    # event +1.0
     "techcrunch.com": 1.0,
     "theguardian.com": 1.0,
     "theverge.com": 1.0,
-    # low_value -2.5
     "247wallst.com": -2.5,
     "etfdailynews.com": -2.5,
     "defenseworld.net": -2.5,
     "americanbankingnews.com": -2.5,
     "markets.financialcontent.com": -2.5,
-    # commentary -4.0 (wins over low_value for overlapping domains)
     "seekingalpha.com": -4.0,
     "tipranks.com": -4.0,
     "fool.com": -4.0,
@@ -50,12 +51,12 @@ _DOMAIN_SCORES: dict[str, float] = {
     "stockanalysis.com": -4.0,
     "simplywall.st": -4.0,
     "barchart.com": -4.0,
-    # pr_aggregator -5.0
     "stocktitan.net": -5.0,
     "mexc.com": -5.0,
 }
 
-_MATERIAL_NEWS_HINTS = (
+# News text signal policy.
+MATERIAL_NEWS_HINTS = (
     "earnings",
     "guidance",
     "forecast",
@@ -89,7 +90,7 @@ _MATERIAL_NEWS_HINTS = (
     "acquired",
 )
 
-_WEAK_NEWS_HINTS = (
+WEAK_NEWS_HINTS = (
     "is this stock a buy",
     "is this stock worth",
     "stock to buy",
@@ -123,7 +124,7 @@ _WEAK_NEWS_HINTS = (
     "good stock to buy",
 )
 
-_EXCLUDED_NEWS_HINTS = (
+EXCLUDED_NEWS_HINTS = (
     "[poll]",
     "what are you most excited about",
     "most excited about",
@@ -135,14 +136,16 @@ _EXCLUDED_NEWS_HINTS = (
     "deep-dive:",
 )
 
-_QUERY_CATEGORY_WEIGHTS = {
+# Query routing policy.
+QUERY_CATEGORY_WEIGHTS = {
     "broad_company_news": 0.6,
     "product_strategy": 1.1,
     "regulatory_legal": 1.1,
     "management_commentary": 1.0,
 }
 
-_EVENT_TOKEN_STOPWORDS = {
+# Event clustering and specificity policy.
+EVENT_TOKEN_STOPWORDS = {
     "latest",
     "company",
     "companies",
@@ -175,14 +178,14 @@ _EVENT_TOKEN_STOPWORDS = {
     "local",
 }
 
-_EVENT_TOKEN_ALIASES = {
+EVENT_TOKEN_ALIASES = {
     "price target": "price_target",
     "capital return": "capital_return",
     "product launch": "product_launch",
     "supply chain": "supply_chain",
 }
 
-_EVENT_CLUSTER_HINTS = {
+EVENT_CLUSTER_HINTS = {
     "commission",
     "china",
     "antitrust",
@@ -200,13 +203,45 @@ _EVENT_CLUSTER_HINTS = {
     "interview",
 }
 
-_MANAGEMENT_TOPIC_HINTS = {
+MANAGEMENT_TOPIC_HINTS = {
     "interview": ("interview",),
     "anniversary": ("50th", "first 50 years", "anniversary"),
     "succession": ("retirement", "succession"),
     "tariffs": ("tariff", "refund"),
     "guidance": ("guidance", "forecast", "outlook"),
 }
+
+__all__ = [
+    "NEWS_FILTER_POLICY_VERSION",
+    "COMPANY_NAME_STOPWORDS",
+    "SOURCE_DOMAIN_PREFERENCES",
+    "MATERIAL_NEWS_HINTS",
+    "WEAK_NEWS_HINTS",
+    "EXCLUDED_NEWS_HINTS",
+    "QUERY_CATEGORY_WEIGHTS",
+    "EVENT_TOKEN_STOPWORDS",
+    "EVENT_TOKEN_ALIASES",
+    "EVENT_CLUSTER_HINTS",
+    "MANAGEMENT_TOPIC_HINTS",
+    "source_preference_score",
+    "build_company_terms",
+    "parse_news_datetime",
+    "select_diverse_news_items",
+    "score_tavily_news_item",
+    "select_preferred_news_item",
+]
+
+# Backward-compatible aliases for existing internal imports and call sites.
+_COMPANY_NAME_STOPWORDS = COMPANY_NAME_STOPWORDS
+_DOMAIN_SCORES = SOURCE_DOMAIN_PREFERENCES
+_MATERIAL_NEWS_HINTS = MATERIAL_NEWS_HINTS
+_WEAK_NEWS_HINTS = WEAK_NEWS_HINTS
+_EXCLUDED_NEWS_HINTS = EXCLUDED_NEWS_HINTS
+_QUERY_CATEGORY_WEIGHTS = QUERY_CATEGORY_WEIGHTS
+_EVENT_TOKEN_STOPWORDS = EVENT_TOKEN_STOPWORDS
+_EVENT_TOKEN_ALIASES = EVENT_TOKEN_ALIASES
+_EVENT_CLUSTER_HINTS = EVENT_CLUSTER_HINTS
+_MANAGEMENT_TOPIC_HINTS = MANAGEMENT_TOPIC_HINTS
 
 
 def _clean_text(value) -> str | None:
@@ -238,12 +273,12 @@ def _domain_key(url: str | None) -> str | None:
     return hostname or None
 
 
-def _source_preference_score(url: str | None) -> float:
+def source_preference_score(url: str | None) -> float:
     domain = _domain_key(url)
-    return _DOMAIN_SCORES.get(domain, 0.0)
+    return SOURCE_DOMAIN_PREFERENCES.get(domain, 0.0)
 
 
-def _build_company_terms(symbol: str, company_name: str) -> tuple[set[str], str | None]:
+def build_company_terms(symbol: str, company_name: str) -> tuple[set[str], str | None]:
     symbol = symbol.lower()
     company_terms = {symbol}
 
@@ -253,7 +288,7 @@ def _build_company_terms(symbol: str, company_name: str) -> tuple[set[str], str 
 
     normalized_name = " ".join(re.findall(r"[a-z0-9]+", clean_name.lower()))
     for token in normalized_name.split():
-        if len(token) < 3 or token in _COMPANY_NAME_STOPWORDS:
+        if len(token) < 3 or token in COMPANY_NAME_STOPWORDS:
             continue
         company_terms.add(token)
 
@@ -264,7 +299,7 @@ def _has_symbol(text: str, symbol: str) -> bool:
     return bool(re.search(rf"\b{re.escape(symbol.lower())}\b", text))
 
 
-def _parse_news_datetime(value: str | None) -> datetime | None:
+def parse_news_datetime(value: str | None) -> datetime | None:
     clean_value = _clean_text(value)
     if not clean_value:
         return None
@@ -291,7 +326,7 @@ def _parse_news_datetime(value: str | None) -> datetime | None:
 
 
 def _recency_bonus(date_value: str | None) -> float:
-    parsed = _parse_news_datetime(date_value)
+    parsed = parse_news_datetime(date_value)
     if parsed is None:
         return 0.0
 
@@ -306,7 +341,7 @@ def _recency_bonus(date_value: str | None) -> float:
 
 
 def _news_age_days(date_value: str | None) -> float | None:
-    parsed = _parse_news_datetime(date_value)
+    parsed = parse_news_datetime(date_value)
     if parsed is None:
         return None
 
@@ -315,14 +350,14 @@ def _news_age_days(date_value: str | None) -> float | None:
 
 def _event_text_tokens(text: str, company_terms: set[str]) -> set[str]:
     normalized_text = text.lower()
-    for phrase, alias in _EVENT_TOKEN_ALIASES.items():
+    for phrase, alias in EVENT_TOKEN_ALIASES.items():
         normalized_text = normalized_text.replace(phrase, alias)
 
     tokens = set()
     for token in re.findall(r"[a-z0-9_]+", normalized_text):
         if len(token) < 3:
             continue
-        if token in company_terms or token in _COMPANY_NAME_STOPWORDS or token in _EVENT_TOKEN_STOPWORDS:
+        if token in company_terms or token in COMPANY_NAME_STOPWORDS or token in EVENT_TOKEN_STOPWORDS:
             continue
         tokens.add(token)
 
@@ -351,7 +386,7 @@ def _management_commentary_signature(item: dict) -> tuple[str | None, set[str]]:
 
     topics = {
         topic
-        for topic, hints in _MANAGEMENT_TOPIC_HINTS.items()
+        for topic, hints in MANAGEMENT_TOPIC_HINTS.items()
         if any(hint in text for hint in hints)
     }
 
@@ -383,14 +418,14 @@ def _is_similar_event(item: dict, other: dict, company_terms: set[str]) -> bool:
     if overlap_ratio >= 0.6:
         return True
 
-    event_hint_overlap = overlap & _EVENT_CLUSTER_HINTS
+    event_hint_overlap = overlap & EVENT_CLUSTER_HINTS
     if item.get("query_category") == other.get("query_category") and len(event_hint_overlap) >= 2:
         return True
 
     return len(event_hint_overlap) >= 2 and overlap_ratio >= 0.25
 
 
-def _select_diverse_news_items(ranked_items: list[dict], num_stories: int, company_terms: set[str]) -> list[dict]:
+def select_diverse_news_items(ranked_items: list[dict], num_stories: int, company_terms: set[str]) -> list[dict]:
     selected = []
     selected_keys = set()
     used_categories = set()
@@ -505,12 +540,56 @@ def _select_diverse_news_items(ranked_items: list[dict], num_stories: int, compa
     return selected[:num_stories]
 
 
-def _score_tavily_news_item(
+def _build_score_reason_summary(
+    *,
+    bucket: str,
+    exclusion_reason: str | None,
+    domain: str | None,
+    domain_source_score: float,
+    recency_bonus: float,
+    age_days: float | None,
+    matched_terms: int,
+    symbol_match: bool,
+    strong_name_match: bool,
+    material_hits: int,
+    weak_hits: int,
+    commentary_domain: bool,
+    pr_aggregator_domain: bool,
+    excluded_pattern: bool,
+) -> dict:
+    flags = []
+    if strong_name_match:
+        flags.append("strong_name_match")
+    if symbol_match:
+        flags.append("symbol_match")
+    if commentary_domain:
+        flags.append("commentary_domain")
+    if pr_aggregator_domain:
+        flags.append("pr_aggregator_domain")
+    if excluded_pattern:
+        flags.append("excluded_pattern")
+
+    return {
+        "policy_version": NEWS_FILTER_POLICY_VERSION,
+        "decision": exclusion_reason or bucket,
+        "domain": domain,
+        "domain_score": domain_source_score,
+        "recency_bonus": recency_bonus,
+        "age_days": round(age_days, 1) if age_days is not None else None,
+        "matched_terms": matched_terms,
+        "material_hits": material_hits,
+        "weak_hits": weak_hits,
+        "flags": flags,
+        "exclusion_reason": exclusion_reason,
+    }
+
+
+def score_tavily_news_item(
     item: dict,
     symbol: str,
     company_terms: set[str],
     company_phrase: str | None,
-) -> tuple[float, str, str | None]:
+) -> dict:
     title = (item.get("title") or "").lower()
     snippet = (item.get("snippet") or "").lower()
     publisher = (item.get("publisher") or "").lower()
@@ -522,18 +601,19 @@ def _score_tavily_news_item(
     ]
     symbol_match = _has_symbol(text, symbol)
     strong_name_match = bool(company_phrase and company_phrase in text)
-    material_hits = sum(1 for hint in _MATERIAL_NEWS_HINTS if hint in text)
-    weak_hits = sum(1 for hint in _WEAK_NEWS_HINTS if hint in text)
+    material_hits = sum(1 for hint in MATERIAL_NEWS_HINTS if hint in text)
+    weak_hits = sum(1 for hint in WEAK_NEWS_HINTS if hint in text)
     weak_pattern = weak_hits > 0
-    excluded_pattern = any(hint in text for hint in _EXCLUDED_NEWS_HINTS)
-    domain_source_score = _source_preference_score(item.get("url"))
-    commentary_domain = _DOMAIN_SCORES.get(domain, 0.0) == -4.0
-    pr_aggregator_domain = _DOMAIN_SCORES.get(domain, 0.0) == -5.0
+    excluded_pattern = any(hint in text for hint in EXCLUDED_NEWS_HINTS)
+    domain_source_score = source_preference_score(item.get("url"))
+    commentary_domain = SOURCE_DOMAIN_PREFERENCES.get(domain, 0.0) == -4.0
+    pr_aggregator_domain = SOURCE_DOMAIN_PREFERENCES.get(domain, 0.0) == -5.0
     age_days = _news_age_days(item.get("date"))
+    recency_bonus = _recency_bonus(item.get("date"))
 
     score = _to_float_or_none(item.get("score")) or 0.0
-    score += _QUERY_CATEGORY_WEIGHTS.get(item.get("query_category"), 0.0)
-    score += _recency_bonus(item.get("date"))
+    score += QUERY_CATEGORY_WEIGHTS.get(item.get("query_category"), 0.0)
+    score += recency_bonus
     score += domain_source_score
 
     if strong_name_match:
@@ -550,28 +630,39 @@ def _score_tavily_news_item(
     if weak_pattern:
         score -= min(weak_hits, 2) * 3.0
 
+    bucket = ""
+    exclusion_reason: str | None = None
+
     if not strong_name_match and not symbol_match and not matched_terms:
-        return score - 4.0, "excluded", "not_company_specific"
+        score -= 4.0
+        bucket = "excluded"
+        exclusion_reason = "not_company_specific"
 
-    if excluded_pattern:
-        return score, "excluded", "low_signal_format"
+    elif excluded_pattern:
+        bucket = "excluded"
+        exclusion_reason = "low_signal_format"
 
-    if age_days is not None and age_days > 90:
-        return score, "excluded", "stale_result"
+    elif age_days is not None and age_days > 90:
+        bucket = "excluded"
+        exclusion_reason = "stale_result"
 
-    if pr_aggregator_domain:
-        return score, "excluded", "pr_aggregator"
+    elif pr_aggregator_domain:
+        bucket = "excluded"
+        exclusion_reason = "pr_aggregator"
 
-    if commentary_domain and weak_hits and material_hits <= 1:
-        return score, "excluded", "commentary_opinion"
+    elif commentary_domain and weak_hits and material_hits <= 1:
+        bucket = "excluded"
+        exclusion_reason = "commentary_opinion"
 
-    if weak_hits >= 2 and material_hits == 0:
-        return score, "excluded", "weak_generic"
+    elif weak_hits >= 2 and material_hits == 0:
+        bucket = "excluded"
+        exclusion_reason = "weak_generic"
 
-    if weak_pattern and _DOMAIN_SCORES.get(domain, 0.0) == -2.5 and material_hits <= 1:
-        return score, "excluded", "weak_generic"
+    elif weak_pattern and SOURCE_DOMAIN_PREFERENCES.get(domain, 0.0) == -2.5 and material_hits <= 1:
+        bucket = "excluded"
+        exclusion_reason = "weak_generic"
 
-    if weak_pattern or commentary_domain or _DOMAIN_SCORES.get(domain, 0.0) == -2.5:
+    elif weak_pattern or commentary_domain or SOURCE_DOMAIN_PREFERENCES.get(domain, 0.0) == -2.5:
         bucket = "weak_or_generic"
     elif strong_name_match or symbol_match or len(matched_terms) >= 2 or material_hits:
         bucket = "high_confidence_company_specific"
@@ -579,10 +670,30 @@ def _score_tavily_news_item(
     else:
         bucket = "broader_context"
 
-    return score, bucket, None
+    return {
+        "score": score,
+        "bucket": bucket,
+        "exclusion_reason": exclusion_reason,
+        "reason_summary": _build_score_reason_summary(
+            bucket=bucket,
+            exclusion_reason=exclusion_reason,
+            domain=domain,
+            domain_source_score=domain_source_score,
+            recency_bonus=recency_bonus,
+            age_days=age_days,
+            matched_terms=len(matched_terms),
+            symbol_match=symbol_match,
+            strong_name_match=strong_name_match,
+            material_hits=material_hits,
+            weak_hits=weak_hits,
+            commentary_domain=commentary_domain,
+            pr_aggregator_domain=pr_aggregator_domain,
+            excluded_pattern=excluded_pattern,
+        ),
+    }
 
 
-def _select_preferred_news_item(existing: dict, candidate: dict) -> dict:
+def select_preferred_news_item(existing: dict, candidate: dict) -> dict:
     existing_score = existing.get("_ranking_score", 0.0)
     candidate_score = candidate.get("_ranking_score", 0.0)
     if candidate_score > existing_score:
@@ -590,9 +701,32 @@ def _select_preferred_news_item(existing: dict, candidate: dict) -> dict:
     if candidate_score < existing_score:
         return existing
 
-    existing_date = _parse_news_datetime(existing.get("date"))
-    candidate_date = _parse_news_datetime(candidate.get("date"))
+    existing_date = parse_news_datetime(existing.get("date"))
+    candidate_date = parse_news_datetime(candidate.get("date"))
     if existing_date and candidate_date and candidate_date > existing_date:
         return candidate
 
     return existing
+
+
+def _score_tavily_news_item(
+    item: dict,
+    symbol: str,
+    company_terms: set[str],
+    company_phrase: str | None,
+) -> tuple[float, str, str | None]:
+    result = score_tavily_news_item(
+        item,
+        symbol=symbol,
+        company_terms=company_terms,
+        company_phrase=company_phrase,
+    )
+    return result["score"], result["bucket"], result["exclusion_reason"]
+
+
+# Backward-compatible aliases for older internal imports and call sites.
+_source_preference_score = source_preference_score
+_build_company_terms = build_company_terms
+_parse_news_datetime = parse_news_datetime
+_select_diverse_news_items = select_diverse_news_items
+_select_preferred_news_item = select_preferred_news_item
