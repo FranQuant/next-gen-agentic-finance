@@ -1,32 +1,37 @@
 # next-gen-agentic-finance
 
-**A progressive example series for Layer 1 agentic finance: AI-powered research intelligence, live retrieval, multi-agent orchestration, and MCP-based issuer intelligence.**
+**Layer 1 examples for public/demo-data retrieval, bounded synthesis, and structured handoffs.**
 
-Built with Agno · OpenAI · Tavily · yfinance · Python 3.13
+Built with Agno, OpenAI, Tavily, yfinance, Python 3.13
 
 ---
 
 ## Context
 
-The current frontier of applied AI in finance is **agentic research** — agents that retrieve live market intelligence, reason over it, and surface structured findings for human review. This is happening in production at major institutions today.
+This repository is a pedagogical Layer 1 repo for agentic finance research intelligence. It focuses on public/demo-data retrieval, bounded synthesis, and structured handoffs for human review.
 
-This repository demonstrates that layer systematically, from a single prompt-only agent to multi-agent orchestration and remote MCP-based issuer intelligence. It is designed as **Layer 1 of a quant research stack**: intelligence gathering and synthesis that feeds human-supervised investment decisions.
+It is intentionally limited in scope: it is not a full research stack, not a backtesting platform, not a portfolio orchestration system, and not an execution engine.
 
-It is not a trading system, portfolio optimizer, or execution engine. Those layers are downstream — and they still require human oversight before any capital action is taken.
+`example8.py` is the canonical structured handoff pattern. `example7.py` is the bridge example. `example9.py` is an adjacent MCP issuer-intelligence demo, not the repo's central contract.
 
 ---
 
-## What this repository is / is not
+## Architectural Contract
 
-**What it is**
-- A focused, progressive demo series covering the core patterns of agentic finance research
-- Designed to be readable, extensible, and honest about what agents can and cannot do reliably
-- A foundation layer: research intelligence designed to inform, not to act
+- `examples/example8.py` is the governing pattern: evidence packet, bounded interpretation, and open questions / gaps.
+- `examples/example0_setup_check.py` through `examples/example6.py` are learning primitives and scaffolding.
+- `examples/example7.py` is the bridge example for staged multi-agent research.
+- `examples/example9.py` is adjacent MCP-based issuer intelligence, not the core contract.
+- `examples/finance_tools.py` and `examples/news_filter.py` are shared read-only helpers, not a platform layer.
+- Outputs are research handoffs for human review, not PM action notes.
 
-**What it is not**
-- Not a production research platform, live trading system, or portfolio management tool
-- Not investment advice
-- Not a framework — it uses [Agno](https://github.com/agno-agi/agno) as the agent layer
+## Governance Posture
+
+- Read-only tools only.
+- Public or demo data only.
+- Human review required before any decision.
+- No autonomous portfolio action.
+- No execution, trading, or capital-allocation workflows in this repo.
 
 ---
 
@@ -35,11 +40,11 @@ It is not a trading system, portfolio optimizer, or execution engine. Those laye
 | Component | Role |
 |---|---|
 | [Agno](https://github.com/agno-agi/agno) | Agent and multi-agent orchestration framework |
-| OpenAI (gpt-4o / o-series) | LLM backend via OpenAI Responses API |
+| OpenAI Responses API | LLM backend for the examples |
 | [Tavily](https://tavily.com) | Live web and news retrieval |
-| yfinance | Market data, options chains, analyst recommendations |
+| yfinance | Market data, company fundamentals, analyst recommendation records, and options chains |
 | DuckDB / CsvTools | SQL-style queries over local structured data |
-| MCP (remote) | Tavily via Model Context Protocol in example9 |
+| MCP (remote) | Tavily via Model Context Protocol in `example9.py` |
 
 ---
 
@@ -75,7 +80,7 @@ cp .env.example .env
 | Variable | Required for |
 |---|---|
 | `OPENAI_API_KEY` | All examples |
-| `TAVILY_API_KEY` | example2 – example4, example9 |
+| `TAVILY_API_KEY` | example2 – example4, example7 – example9 |
 | `EXAMPLE9_TAVILY_MCP_URL` | example9 (remote MCP) |
 | `FRED_API_KEY` | Reserved for future macro examples |
 
@@ -96,9 +101,9 @@ The series builds one concept at a time. Each example adds exactly one new patte
 | `example4.py` | Interactive console | Turns the retrieval agent into an ad hoc analyst CLI |
 | `example5.py` | Structured data agent | SQL-style queries over a local LatAm equities CSV via DuckDB |
 | `example6.py` | Custom tool definition | Options max-pain computation: pure function → `@tool` → agent |
-| `example7.py` | Multi-agent team | 3-agent research brief: market data → company info → orchestrator |
-| `example8.py` | Structured handoff | Evidence packet → interpretation → open questions; explicit gap tracking |
-| `example9.py` | Remote MCP | Issuer intelligence via Agno + Tavily over async MCP transport |
+| `example7.py` | Bridge example | 3-agent research brief: market data → company info → orchestrator |
+| `example8.py` | Canonical structured handoff | Evidence packet → interpretation → open questions; explicit gap tracking |
+| `example9.py` | Adjacent MCP demo | Issuer intelligence via Agno + Tavily over async MCP transport |
 
 ### The learning arc
 
@@ -106,8 +111,9 @@ The series builds one concept at a time. Each example adds exactly one new patte
 ex0–1   Static prompts, no tools          → understand the baseline
 ex2–4   Live retrieval, debug, interactive → add tools, inspect behavior
 ex5–6   Structured data + custom tools    → connect agents to real data sources
-ex7–8   Multi-agent orchestration         → coordinate specialist agents with JSON handoffs
-ex9     MCP + async transport             → production-adjacent retrieval patterns
+ex7     Bridge to staged multi-agent flow  → coordinate specialist agents
+ex8     Canonical structured handoff      → structured evidence, read, and gaps
+ex9     Adjacent MCP demo                  → issuer intelligence over async transport
 ```
 
 ---
@@ -117,7 +123,7 @@ ex9     MCP + async transport             → production-adjacent retrieval patt
 `examples/finance_tools.py` provides the shared finance utility functions used across examples:
 
 - `get_current_stock_price` — price, OHLCV, session timing
-- `get_analyst_recommendations` — buy/hold/sell counts, price targets
+- `get_analyst_recommendations` — recent analyst recommendation records and aggregate stance context
 - `get_company_info` — sector, fundamentals, valuation ratios
 - `get_company_news` — yfinance news feed
 - `get_company_news_tavily` — deduplicated, quality-scored news via 4 sequential Tavily queries
@@ -146,11 +152,14 @@ next-gen-agentic-finance/
 
 ## Where to Start
 
-Run `example0_setup_check.py` first, then go in order. The progression is intentional — each example assumes familiarity with the one before it.
+If you want the repo's governing pattern, start with `example8.py`.
+
+If you want the full learning sequence, run `example0_setup_check.py` first, then go in order. The progression is intentional — each example assumes familiarity with the one before it.
 
 If you want to jump to a specific pattern:
+- **Canonical structured handoff** → `example8.py`
+- **Bridge into multi-agent orchestration** → `example7.py`
 - **Custom tool design** → `example6.py`
-- **Multi-agent orchestration** → `example7.py`
 - **MCP integration** → `example9.py`
 
 ---
