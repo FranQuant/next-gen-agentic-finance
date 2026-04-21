@@ -31,7 +31,7 @@ SOURCE_DOMAIN_PREFERENCES: dict[str, float] = {
     "bloomberg.com": 2.0,
     "wsj.com": 2.0,
     "ft.com": 2.0,
-    "cnbc.com": 2.0,
+    "cnbc.com": 1.0,
     "apnews.com": 2.0,
     "finance.yahoo.com": 2.0,
     "sec.gov": 2.0,
@@ -51,6 +51,7 @@ SOURCE_DOMAIN_PREFERENCES: dict[str, float] = {
     "stockanalysis.com": -4.0,
     "simplywall.st": -4.0,
     "barchart.com": -4.0,
+    "thestreet.com": -4.0,
     "stocktitan.net": -5.0,
     "mexc.com": -5.0,
 }
@@ -74,6 +75,17 @@ MATERIAL_NEWS_HINTS = (
     "lawsuit",
     "antitrust",
     "investigation",
+    "filing",
+    "filed",
+    "sec",
+    "8-k",
+    "10-k",
+    "10-q",
+    "proxy",
+    "prospectus",
+    "form 4",
+    "13d",
+    "13g",
     "ceo",
     "cfo",
     "management",
@@ -135,6 +147,66 @@ EXCLUDED_NEWS_HINTS = (
     "stock research article",
     "deep-dive:",
 )
+
+MEDIA_DISCUSSION_NEWS_HINTS = (
+    "video",
+    "clip",
+    "tv",
+    "television",
+    "podcast",
+    "segment",
+    "commentary",
+    "discussion",
+    "opinion",
+    "watch",
+    "listen",
+)
+
+MARKET_COLOR_NEWS_HINTS = (
+    "market color",
+    "market-color",
+    "stock move",
+    "stock moves",
+    "shares rise",
+    "shares fall",
+    "shares higher",
+    "shares lower",
+    "premarket",
+    "pre-market",
+    "after-hours",
+    "after hours",
+    "on the move",
+    "trading higher",
+    "trading lower",
+    "why the stock",
+)
+
+ANALYST_COVERAGE_NEWS_HINTS = (
+    "analyst coverage",
+    "reinstat",
+    "resumes coverage",
+    "resume coverage",
+    "price target",
+    "target raise",
+    "target cut",
+    "upgrade",
+    "downgrade",
+    "rating",
+    "recommendation",
+)
+
+SOFT_OPINION_NEWS_HINTS = (
+    "what to do now",
+    "is this stock",
+    "good stock to buy",
+    "wall street thinks",
+    "what analysts think",
+)
+
+LOW_TRUST_HIGH_CONFIDENCE_DOMAINS = {
+    "cnbc.com",
+    "thestreet.com",
+}
 
 # Query routing policy.
 QUERY_CATEGORY_WEIGHTS = {
@@ -260,6 +332,10 @@ def _to_float_or_none(value) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _contains_any(text: str, hints: tuple[str, ...]) -> bool:
+    return any(hint in text for hint in hints)
 
 
 def _domain_key(url: str | None) -> str | None:
@@ -556,6 +632,11 @@ def _build_score_reason_summary(
     commentary_domain: bool,
     pr_aggregator_domain: bool,
     excluded_pattern: bool,
+    media_discussion_story: bool,
+    market_color_story: bool,
+    analyst_coverage_story: bool,
+    soft_opinion_story: bool,
+    filing_style_story: bool,
 ) -> dict:
     flags = []
     if strong_name_match:
@@ -566,8 +647,20 @@ def _build_score_reason_summary(
         flags.append("commentary_domain")
     if pr_aggregator_domain:
         flags.append("pr_aggregator_domain")
+    if domain in LOW_TRUST_HIGH_CONFIDENCE_DOMAINS:
+        flags.append("low_trust_domain")
     if excluded_pattern:
         flags.append("excluded_pattern")
+    if media_discussion_story:
+        flags.append("media_discussion_story")
+    if market_color_story:
+        flags.append("market_color_story")
+    if analyst_coverage_story:
+        flags.append("analyst_coverage_story")
+    if soft_opinion_story:
+        flags.append("soft_opinion_story")
+    if filing_style_story:
+        flags.append("filing_style_story")
 
     return {
         "policy_version": NEWS_FILTER_POLICY_VERSION,
@@ -608,6 +701,13 @@ def score_tavily_news_item(
     domain_source_score = source_preference_score(item.get("url"))
     commentary_domain = SOURCE_DOMAIN_PREFERENCES.get(domain, 0.0) == -4.0
     pr_aggregator_domain = SOURCE_DOMAIN_PREFERENCES.get(domain, 0.0) == -5.0
+    low_trust_domain = domain in LOW_TRUST_HIGH_CONFIDENCE_DOMAINS
+    media_discussion_story = _contains_any(text, MEDIA_DISCUSSION_NEWS_HINTS)
+    market_color_story = _contains_any(text, MARKET_COLOR_NEWS_HINTS)
+    analyst_coverage_story = _contains_any(text, ANALYST_COVERAGE_NEWS_HINTS)
+    soft_opinion_story = _contains_any(text, SOFT_OPINION_NEWS_HINTS)
+    filing_style_story = _contains_any(text, ("filing", "sec", "8-k", "10-k", "10-q", "proxy", "prospectus", "form 4", "13d", "13g"))
+    low_quality_story = media_discussion_story or market_color_story or analyst_coverage_story or soft_opinion_story
     age_days = _news_age_days(item.get("date"))
     recency_bonus = _recency_bonus(item.get("date"))
 
@@ -629,6 +729,8 @@ def score_tavily_news_item(
     score += min(material_hits, 2) * 1.0
     if weak_pattern:
         score -= min(weak_hits, 2) * 3.0
+    if low_quality_story:
+        score -= 1.5
 
     bucket = ""
     exclusion_reason: str | None = None
@@ -662,7 +764,10 @@ def score_tavily_news_item(
         bucket = "excluded"
         exclusion_reason = "weak_generic"
 
-    elif weak_pattern or commentary_domain or SOURCE_DOMAIN_PREFERENCES.get(domain, 0.0) == -2.5:
+    elif low_trust_domain and not filing_style_story:
+        bucket = "weak_or_generic"
+
+    elif weak_pattern or low_quality_story or commentary_domain or SOURCE_DOMAIN_PREFERENCES.get(domain, 0.0) == -2.5:
         bucket = "weak_or_generic"
     elif strong_name_match or symbol_match or len(matched_terms) >= 2 or material_hits:
         bucket = "high_confidence_company_specific"
@@ -689,6 +794,11 @@ def score_tavily_news_item(
             commentary_domain=commentary_domain,
             pr_aggregator_domain=pr_aggregator_domain,
             excluded_pattern=excluded_pattern,
+            media_discussion_story=media_discussion_story,
+            market_color_story=market_color_story,
+            analyst_coverage_story=analyst_coverage_story,
+            soft_opinion_story=soft_opinion_story,
+            filing_style_story=filing_style_story,
         ),
     }
 

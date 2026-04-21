@@ -73,6 +73,47 @@ def test_score_tavily_news_item_excludes_weak_commentary():
     assert "commentary_domain" in result["reason_summary"]["flags"]
 
 
+def test_score_tavily_news_item_demotes_cnbc_video_commentary():
+    company_terms, company_phrase = news_filter.build_company_terms("MSFT", "Microsoft Corporation")
+    result = news_filter.score_tavily_news_item(
+        _news_item(
+            title="CNBC video: Microsoft stock move after earnings",
+            snippet="On TV, analysts discuss the stock move and commentary.",
+            publisher="CNBC",
+            url="https://www.cnbc.com/video/microsoft-earnings/",
+        ),
+        symbol="MSFT",
+        company_terms=company_terms,
+        company_phrase=company_phrase,
+    )
+
+    assert result["bucket"] == "weak_or_generic"
+    assert result["exclusion_reason"] is None
+    assert "media_discussion_story" in result["reason_summary"]["flags"]
+    assert "market_color_story" in result["reason_summary"]["flags"]
+    assert "low_trust_domain" in result["reason_summary"]["flags"]
+
+
+def test_score_tavily_news_item_demotes_analyst_coverage_reinstatement():
+    company_terms, company_phrase = news_filter.build_company_terms("MSFT", "Microsoft Corporation")
+    result = news_filter.score_tavily_news_item(
+        _news_item(
+            title="TheStreet analyst reinstates Microsoft coverage after the stock move",
+            snippet="The analyst raised the price target and discussed the rating.",
+            publisher="TheStreet",
+            url="https://www.thestreet.com/markets/microsoft-coverage/",
+        ),
+        symbol="MSFT",
+        company_terms=company_terms,
+        company_phrase=company_phrase,
+    )
+
+    assert result["bucket"] == "weak_or_generic"
+    assert result["exclusion_reason"] is None
+    assert "analyst_coverage_story" in result["reason_summary"]["flags"]
+    assert "low_trust_domain" in result["reason_summary"]["flags"]
+
+
 def test_score_tavily_news_item_checks_company_specificity():
     company_terms, company_phrase = news_filter.build_company_terms("AAPL", "Apple Inc")
 
