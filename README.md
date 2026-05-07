@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/franquant-next-gen-agentic-finance-badge.png)](https://mseep.ai/app/franquant-next-gen-agentic-finance)
+
 # next-gen-agentic-finance
 
 **Layer 1 examples for public/demo-data retrieval, bounded synthesis, and structured handoffs.**
