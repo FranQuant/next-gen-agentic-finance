@@ -29,10 +29,10 @@ Examples 6, 7, and 8 show three levels of agent coordination:
   ┌─────────┐                  │   Company Info        │   Interpretation
   │ Custom  │                  ↓                       │   Open Gaps
   │  Tool   │            ┌──────────┐                 ↓
-  └────┬────┘            │Research  │        ┌────────────────┐
-       │                 │ Brief    │        │ Structured     │
-       ↓                 └──────────┘        │ Handoff        │
-  ┌─────────┐                               └────────────────┘
+  └────┬────┘            │Research  │        ┌──────────────────┐
+       │                 │ Brief    │        │ Structured       │
+       ↓                 └──────────┘        │ Handoff          │
+  ┌─────────┐                               └──────────────────┘
   │ Output  │            example7.py
   └─────────┘            (Bridge)             example8.py
                                               (Canonical)
