@@ -21,21 +21,21 @@ A pedagogical demonstration of agentic research workflows for finance. Each exam
 Examples 6, 7, and 8 show three levels of agent coordination:
 
 ```
-┌─────────────┐       ┌─────────────┐       ┌─────────────────┐
-│   Agent     │       │ Orchestrator│       │  Orchestrator   │
-└──────┬──────┘       └──────┬──────┘       └────────┬────────┘
-       │                     │                       │
-       ↓                     ├─→ Market Data         ├─→ Evidence
-  ┌─────────┐                │   Company Info        │   Interpretation
-  │ Custom  │                ↓                       │   Open Gaps
-  │  Tool   │          ┌──────────┐                 │
-  └────┬────┘          │ Research │                 ↓
-       │               │ Brief    │         ┌─────────────────┐
-       ↓               └──────────┘         │   Structured    │
-  ┌─────────┐                              │   Handoff       │
-  │ Output  │          example7.py         └─────────────────┘
-  └─────────┘          (Bridge)             example8.py
-                                            (Canonical)
+┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+│   Agent     │         │ Orchestrator│         │ Orchestrator│
+└──────┬──────┘         └──────┬──────┘         └──────┬──────┘
+       │                       │                       │
+       ↓                       ├─→ Market Data         ├─→ Evidence Packet
+  ┌─────────┐                  │   Company Info        │   Interpretation
+  │ Custom  │                  ↓                       │   Open Gaps
+  │  Tool   │            ┌──────────┐                 ↓
+  └────┬────┘            │Research  │        ┌──────────────────┐
+       │                 │ Brief    │        │ Structured       │
+       ↓                 └──────────┘        │ Handoff          │
+  ┌─────────┐                               └──────────────────┘
+  │ Output  │            example7.py
+  └─────────┘            (Bridge)             example8.py
+                                              (Canonical)
   example6.py
   (Custom tools)
 ```
