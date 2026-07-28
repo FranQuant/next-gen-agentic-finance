@@ -20,24 +20,28 @@ A pedagogical demonstration of agentic research workflows for finance. Each exam
 
 Examples 6, 7, and 8 show three levels of agent coordination:
 
-```
-┌─────────────┐         ┌─────────────┐         ┌─────────────┐
-│   Agent     │         │ Orchestrator│         │ Orchestrator│
-└──────┬──────┘         └──────┬──────┘         └──────┬──────┘
-       │                       │                       │
-       ↓                       ├─→ Market Data         ├─→ Evidence Packet
-  ┌─────────┐                  │   Company Info        │   Interpretation
-  │ Custom  │                  ↓                       │   Open Gaps
-  │  Tool   │            ┌──────────┐                 ↓
-  └────┬────┘            │Research  │        ┌──────────────────┐
-       │                 │ Brief    │        │ Structured       │
-       ↓                 └──────────┘        │ Handoff          │
-  ┌─────────┐                               └──────────────────┘
-  │ Output  │            example7.py
-  └─────────┘            (Bridge)             example8.py
-                                              (Canonical)
-  example6.py
-  (Custom tools)
+```mermaid
+graph TD
+    subgraph ex6["example6.py: Custom Tools"]
+        A["Agent"] --> B["Custom Tool"]
+        B --> C["Output"]
+    end
+    
+    subgraph ex7["example7.py: Multi-Agent Bridge"]
+        D["Orchestrator"] --> E["Market Data"]
+        D --> F["Company Info"]
+        E --> G["Research Brief"]
+        F --> G
+    end
+    
+    subgraph ex8["example8.py: Canonical Handoff"]
+        H["Orchestrator"] --> I["Evidence Packet"]
+        H --> J["Interpretation"]
+        H --> K["Open Gaps"]
+        I --> L["Structured Handoff"]
+        J --> L
+        K --> L
+    end
 ```
 
 ---
